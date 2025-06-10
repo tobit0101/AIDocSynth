@@ -5,7 +5,7 @@ from aidocsynth.models.job import Job
 from aidocsynth.utils.worker     import Worker
 from aidocsynth.services.settings_service import settings
 from aidocsynth.services.file_manager     import backup_original, move_sorted, move_unsorted
-from aidocsynth.services.text_pipeline    import extract_text_stub
+from aidocsynth.services.text_pipeline    import full_text
 from aidocsynth.services.providers.base   import get_provider
 
 class MainController(QObject):
@@ -19,8 +19,8 @@ class MainController(QObject):
     async def _pipeline(self, job):
         cfg, src = settings.data, Path(job.path)
         backup_original(src, cfg)
-        txt = extract_text_stub(src)
-        data = get_provider(cfg.llm).classify_document({"content": txt})
+        text = await full_text(src)
+        data = get_provider(cfg.llm).classify_document({"content": text})
         data = await data
         try: move_sorted(src, data["targetPath"], data["fileName"], cfg); job.status="done"
         except Exception: move_unsorted(src, cfg); job.status="error"

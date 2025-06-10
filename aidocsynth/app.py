@@ -7,6 +7,8 @@ import sys
 from .ui import qrc_resources
 from .ui.drop_area import DropArea
 from .controllers.main_controller import MainController
+from .utils.worker import Worker
+from .services.ocr_service import _model
 
 def main():
     app = QApplication(sys.argv)
@@ -28,7 +30,11 @@ def main():
         drop_area = DropArea()
         frame.layout().addWidget(drop_area)
     
-    win.show()
+        win.show()
+
+    # Splash-Screen schließen, nachdem das OCR-Modell initialisiert wurde
+    def hide_splash(_): splash.finish(win)
+    Worker(_model).sig.finished.connect(hide_splash)
     
     ctrl = MainController()
     if 'drop_area' in locals():
