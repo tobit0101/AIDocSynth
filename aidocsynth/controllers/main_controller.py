@@ -1,12 +1,12 @@
 import json
 from pathlib import Path
 from PySide6.QtCore import QObject, Signal, QThreadPool
-from models.job import Job
-from utils.worker     import Worker
-from services.settings_service import settings
-from services.file_manager     import backup_original, move_sorted, move_unsorted
-from services.text_pipeline    import extract_text_stub
-from services.providers.base   import get_provider
+from aidocsynth.models.job import Job
+from aidocsynth.utils.worker     import Worker
+from aidocsynth.services.settings_service import settings
+from aidocsynth.services.file_manager     import backup_original, move_sorted, move_unsorted
+from aidocsynth.services.text_pipeline    import extract_text_stub
+from aidocsynth.services.providers.base   import get_provider
 
 class MainController(QObject):
     jobAdded = Signal(Job); jobUpdated = Signal(Job)

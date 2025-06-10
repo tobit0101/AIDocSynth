@@ -1,6 +1,6 @@
 import shutil, datetime
 from pathlib import Path
-from models.settings import AppSettings
+from aidocsynth.models.settings import AppSettings
 
 def backup_original(src: Path, cfg: AppSettings):
     d = cfg.backup_root / datetime.date.today().strftime("%Y%m%d")

@@ -1,6 +1,6 @@
 from pathlib import Path
 from dotenv import load_dotenv
-from models.settings import AppSettings
+from aidocsynth.models.settings import AppSettings
 
 _CFG = Path.home() / ".config" / "AIDocSynth" / "settings.json"
 load_dotenv()
