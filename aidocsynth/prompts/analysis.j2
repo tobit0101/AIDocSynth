@@ -1,4 +1,17 @@
-Analysiere das Dokument und gib reines JSON
+Based on the content of the document below, suggest a relative target directory path and a new filename.
+
+The response MUST be a single, raw JSON object with the keys "targetPath" and "fileName". Do not include any other text, explanations, or markdown formatting.
+
+Example response:
+{
+    "targetPath": "invoices/2024/acme_corp",
+    "fileName": "2024-05-15_invoice_12345.pdf"
+}
+
+Document Content:
+---
+{{ content }}
+---
 {"targetPath": "...", "fileName": "..."} zurück:
 
 {{ content }}

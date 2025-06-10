@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from importlib import resources
+from jinja2 import Environment, PackageLoader, select_autoescape
 import json
 from aidocsynth.models.settings import LLMSettings
 
@@ -12,8 +12,14 @@ class ProviderBase(ABC):
     name: str
     def __init__(self, cfg: LLMSettings): self.cfg = cfg
     
-    @staticmethod
-    def _prompt(name: str, **kw): return resources.files("aidocsynth.prompts").joinpath(name).read_text().format(**kw)
+    _PROMPT_ENV = Environment(
+        loader=PackageLoader("aidocsynth", "prompts"),
+        autoescape=select_autoescape()
+    )
+
+    def _prompt(self, name: str, **kw):
+        template = self._PROMPT_ENV.get_template(name)
+        return template.render(**kw)
 
     async def classify_document(self, ctx: dict):
         return json.loads(await self._run(self._prompt("analysis.j2", **ctx)))

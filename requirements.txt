@@ -39,7 +39,8 @@ PySide6==6.9.1
 PySide6_Addons==6.9.1
 PySide6_Essentials==6.9.1
 pytest==8.4.0
-pytest-mock==3.14.1
+pytest-mock
+pytest-qt==4.4.0
 python-doctr==0.11.0
 python-dotenv==1.1.0
 PyYAML==6.0.2

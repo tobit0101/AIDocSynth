@@ -16,14 +16,27 @@ class Worker(QRunnable):
 
     @Slot()
     def run(self):
+        """Executes the worker function, handling both sync and async functions."""
         try:
             if inspect.iscoroutinefunction(self.fn):
-                loop = asyncio.new_event_loop(); asyncio.set_event_loop(loop)
-                result = loop.run_until_complete(self.fn(*self.args, **self.kwargs))
+                # For async functions, run them in a new event loop
+                result = asyncio.run(self.fn(*self.args, **self.kwargs))
             else:
+                # For sync functions, run them directly
                 result = self.fn(*self.args, **self.kwargs)
-            self.sig.result.emit(result)
         except Exception as e:
-            self.sig.error.emit(str(e))
+            traceback.print_exc()
+            try:
+                self.sig.error.emit(str(e))
+            except RuntimeError:
+                pass  # Signal source might be deleted
+        else:
+            try:
+                self.sig.result.emit(result)
+            except RuntimeError:
+                pass  # Signal source might be deleted
         finally:
-            self.sig.finished.emit(None)
+            try:
+                self.sig.finished.emit(None)
+            except RuntimeError:
+                pass  # Signal source might be deleted

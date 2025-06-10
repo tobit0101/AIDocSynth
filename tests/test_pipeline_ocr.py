@@ -1,24 +1,82 @@
 import json, tempfile, shutil
 from pathlib import Path
+from unittest.mock import AsyncMock
 from aidocsynth.controllers.main_controller import MainController
 from aidocsynth.services.settings_service  import settings
+import datetime
 
 def test_pipeline_ocr(monkeypatch):
-    temp = Path(tempfile.mkdtemp()); pdf = temp/"dummy.pdf"; pdf.write_bytes(b"%PDF-1.4")
-    settings.data.work_dir = temp/"out"; settings.data.backup_root = temp/"out/backup"
-    settings.data.unsorted_root = temp/"out/unsorted"
+    # Setup: Create temporary directories for output
+    temp = Path(tempfile.mkdtemp())
+    settings.data.work_dir = temp / "out"
+    settings.data.backup_root = temp / "out/backup"
+    settings.data.unsorted_root = temp / "out/unsorted"
 
-    # stubs: Patch where the functions are used (in text_pipeline)
-    monkeypatch.setattr("aidocsynth.services.text_pipeline.extract_direct", lambda *_: "TXT")
-    monkeypatch.setattr("aidocsynth.services.text_pipeline.ocr_text", lambda *_: "OCR")
+    # Use the real PDF for testing, but copy it to the temp dir first
+    # to avoid modifying the original test asset.
+    test_dir = Path(__file__).parent
+    original_pdf_path = test_dir / "assets" / "dummy.pdf"
+    pdf = temp / original_pdf_path.name
+    shutil.copy2(original_pdf_path, pdf)
+
+    # Stub only the provider, not the OCR part
     monkeypatch.setattr(
         "aidocsynth.services.providers.dummy_provider.DummyProvider._run",
-        lambda self, p: json.dumps({"targetPath":"T","fileName":"x.txt"})
+        AsyncMock(return_value=json.dumps({"targetPath": "T", "fileName": "x.txt"}))
     )
 
+    # Run the pipeline synchronously for the test
     import asyncio
     from aidocsynth.models.job import Job
     job = Job(path=str(pdf))
     asyncio.run(MainController()._pipeline(job))
-    assert (settings.data.backup_root / pdf.name).exists()
+
+    # Assert: Check if the file was backed up and sorted correctly.
+    date_str = datetime.date.today().strftime("%Y%m%d")
+    backup_path = settings.data.backup_root / date_str / pdf.name
+    sorted_path = settings.data.work_dir / "T" / "x.txt"
+
+    assert backup_path.exists(), f"Backup file not found at {backup_path}"
+    assert sorted_path.exists(), f"Sorted file not found at {sorted_path}"
+    assert pdf.exists(), f"Source file was moved, but should have been copied."
+
+    # Teardown: Clean up the temporary directory
     shutil.rmtree(temp)
+
+def test_pipeline_ocr_on_image(monkeypatch):
+    # Setup: Create temporary directories for output
+    temp = Path(tempfile.mkdtemp())
+    settings.data.work_dir = temp / "out"
+    settings.data.backup_root = temp / "out/backup"
+    settings.data.unsorted_root = temp / "out/unsorted"
+
+    # Use a real image for testing, copying it to the temp dir first.
+    test_dir = Path(__file__).parent
+    original_image_path = test_dir / "assets" / "sample.jpg"
+    img_path = temp / original_image_path.name
+    shutil.copy2(original_image_path, img_path)
+
+    # Stub only the provider, not the OCR part
+    monkeypatch.setattr(
+        "aidocsynth.services.providers.dummy_provider.DummyProvider._run",
+        AsyncMock(return_value=json.dumps({"targetPath": "T", "fileName": "x.txt"}))
+    )
+
+    # Run the pipeline synchronously for the test
+    import asyncio
+    from aidocsynth.models.job import Job
+    job = Job(path=str(img_path))
+    asyncio.run(MainController()._pipeline(job))
+
+    # Assert: Check if the file was backed up and sorted correctly.
+    date_str = datetime.date.today().strftime("%Y%m%d")
+    backup_path = settings.data.backup_root / date_str / img_path.name
+    sorted_path = settings.data.work_dir / "T" / "x.txt"
+
+    assert backup_path.exists(), f"Backup file not found at {backup_path}"
+    assert sorted_path.exists(), f"Sorted file not found at {sorted_path}"
+    assert img_path.exists(), f"Source file was moved, but should have been copied."
+
+    # Teardown: Clean up the temporary directory
+    shutil.rmtree(temp)
+
