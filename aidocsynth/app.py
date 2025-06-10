@@ -2,6 +2,9 @@ from PySide6.QtWidgets import QApplication, QMainWindow, QSystemTrayIcon, QMenu
 from PySide6.QtGui import QIcon
 import sys
 
+# Wichtig: Importiert die kompilierten Ressourcen (Icons, etc.)
+from aidocsynth.ui import qrc_resources
+
 def main():
     app = QApplication(sys.argv)
     win = QMainWindow()
