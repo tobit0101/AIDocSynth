@@ -1,10 +1,15 @@
+from PySide6.QtCore import QStandardPaths
 from pydantic import BaseModel, Field
-from typing import Optional
+from pathlib import Path
 
-class ProviderSettings(BaseModel):
-    provider_name: str = "default"
-    api_key: Optional[str] = None
+docs = Path(QStandardPaths.writableLocation(QStandardPaths.DocumentsLocation))
+
+class LLMSettings(BaseModel):
+    provider: str = "openai"
+    openai_api_key: str | None = None
 
 class AppSettings(BaseModel):
-    provider: ProviderSettings = Field(default_factory=ProviderSettings)
-    # Weitere Einstellungen können hier später hinzugefügt werden.
+    work_dir:      Path = docs / "AIDocSynth"
+    backup_root:   Path = work_dir / "backup"
+    unsorted_root: Path = work_dir / "unsorted"
+    llm: LLMSettings = Field(default_factory=LLMSettings)
