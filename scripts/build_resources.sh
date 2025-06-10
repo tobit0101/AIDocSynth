@@ -1,3 +1,2 @@
 #!/usr/bin/env bash
-cd aidocsynth
-pyside6-rcc ../resources.qrc -o ui/qrc_resources.py
+pyside6-rcc resources.qrc -o aidocsynth/ui/qrc_resources.py
