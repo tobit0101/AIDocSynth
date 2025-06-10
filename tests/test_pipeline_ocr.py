@@ -16,6 +16,9 @@ def test_pipeline_ocr(monkeypatch):
         lambda self, p: json.dumps({"targetPath":"T","fileName":"x.txt"})
     )
 
-    MainController()._pipeline(type('Job', (object,), {'path': str(pdf)}))
+    import asyncio
+    from aidocsynth.models.job import Job
+    job = Job(path=str(pdf))
+    asyncio.run(MainController()._pipeline(job))
     assert (settings.data.backup_root / pdf.name).exists()
     shutil.rmtree(temp)
