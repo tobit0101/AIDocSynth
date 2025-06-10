@@ -1,0 +1,5 @@
+<RCC>
+  <qresource prefix="/">
+    <file>aidocsynth/ui/resources/app.png</file>
+  </qresource>
+</RCC>
