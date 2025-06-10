@@ -12,7 +12,7 @@ def main():
     win.resize(600, 400)
     win.show()
 
-    icon = QIcon(":/app.png")            # Ressource ab Schritt 7
+            icon = QIcon(":/app.png")            # Ressource ab Schritt 7
     tray = QSystemTrayIcon(icon, app)
     menu = QMenu(); menu.addAction("Beenden", app.quit)
     tray.setContextMenu(menu); tray.show()

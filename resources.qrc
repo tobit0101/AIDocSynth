@@ -1,5 +1,5 @@
 <RCC>
   <qresource prefix="/">
-        <file>aidocsynth/ui/resources/app.png</file>
+        <file alias="app.png">aidocsynth/ui/resources/app.png</file>
   </qresource>
 </RCC>
