@@ -389,7 +389,7 @@ pyside6-rcc resources.qrc -o aidocsynth/ui/qrc_resources.py
 
 ---
 
-## Ausbaustufe 3 – **UI + OCR** (feingranular)
+## Ausbaustufe 3 – **UI + OCR** 
 
 *(folge strikt der Reihenfolge – **ein fett gesetzter Block = ein Git-Commit**)*
 

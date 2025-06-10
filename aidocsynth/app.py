@@ -1,15 +1,32 @@
-from PySide6.QtWidgets import QApplication, QMainWindow, QSystemTrayIcon, QMenu
+from PySide6.QtWidgets import QApplication, QMainWindow, QSystemTrayIcon, QMenu, QFrame
 from PySide6.QtGui import QIcon
+from PySide6.QtUiTools import QUiLoader
 import sys
+
+# Wichtig: Importiert die kompilierten Ressourcen (Icons, etc.)
 from .ui import qrc_resources
+from .ui.drop_area import DropArea
+from .controllers.main_controller import MainController
 
 def main():
     app = QApplication(sys.argv)
-    win = QMainWindow()
-    win.setWindowTitle("AIDocSynth stub")
-    win.resize(600, 400)
+    
+    loader = QUiLoader()
+    win = loader.load("aidocsynth/ui/main_window.ui", None)
+    
+    # Ersetze den QFrame durch die DropArea
+    frame = win.findChild(QFrame, "dropFrame")
+    if frame:
+        drop_area = DropArea()
+        frame.layout().addWidget(drop_area)
+    
     win.show()
+    
+    ctrl = MainController()
+    if 'drop_area' in locals():
+        drop_area.filesDropped.connect(ctrl.handle_drop)
 
+    # Tray Icon
     icon = QIcon(":/app.png")
     tray = QSystemTrayIcon(icon, app)
     menu = QMenu()
