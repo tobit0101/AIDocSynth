@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>dockStatus</class>
+ <widget class="QDockWidget" name="dockStatus">
+  <property name="windowTitle">
+   <string>Status</string>
+  </property>
+  <widget class="QWidget" name="dockWidgetContents">
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <item>
+     <widget class="QTableView" name="tblJobs"/>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
