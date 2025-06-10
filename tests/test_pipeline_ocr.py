@@ -16,6 +16,6 @@ def test_pipeline_ocr(monkeypatch):
         lambda self, p: json.dumps({"targetPath":"T","fileName":"x.txt"})
     )
 
-    MainController().handle_drop([str(pdf)])
+    MainController()._pipeline(type('Job', (object,), {'path': str(pdf)}))
     assert (settings.data.backup_root / pdf.name).exists()
     shutil.rmtree(temp)
