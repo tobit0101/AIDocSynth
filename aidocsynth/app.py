@@ -1,5 +1,5 @@
-from PySide6.QtWidgets import QApplication, QMainWindow, QSystemTrayIcon, QMenu, QFrame
-from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import QApplication, QMainWindow, QSystemTrayIcon, QMenu, QFrame, QSplashScreen
+from PySide6.QtGui import QIcon, QPixmap, QMovie
 from PySide6.QtUiTools import QUiLoader
 import sys
 
@@ -10,6 +10,14 @@ from .controllers.main_controller import MainController
 
 def main():
     app = QApplication(sys.argv)
+
+    # Splash-Screen anzeigen
+    splash = QSplashScreen(QPixmap(":/spinner.gif"))
+    movie = QMovie(":/spinner.gif")
+    splash.setMovie(movie)
+    movie.start()
+    splash.showMessage("Initialisiere OCR…")
+    splash.show()
     
     loader = QUiLoader()
     win = loader.load("aidocsynth/ui/main_window.ui", None)

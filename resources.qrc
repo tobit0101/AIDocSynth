@@ -1,5 +1,6 @@
 <RCC>
   <qresource prefix="/">
-        <file alias="app.png">aidocsynth/ui/resources/app.png</file>
+                <file alias="app.png">aidocsynth/ui/resources/app.png</file>
+        <file alias="spinner.gif">aidocsynth/ui/resources/spinner.gif</file>
   </qresource>
 </RCC>
