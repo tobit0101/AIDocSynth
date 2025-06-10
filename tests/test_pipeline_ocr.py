@@ -8,9 +8,9 @@ def test_pipeline_ocr(monkeypatch):
     settings.data.work_dir = temp/"out"; settings.data.backup_root = temp/"out/backup"
     settings.data.unsorted_root = temp/"out/unsorted"
 
-    # stubs
-    monkeypatch.setattr("aidocsynth.services.text_pdf.extract_direct", lambda *_: "TXT")
-    monkeypatch.setattr("aidocsynth.services.ocr_service.ocr_text", lambda *_: "OCR")
+    # stubs: Patch where the functions are used (in text_pipeline)
+    monkeypatch.setattr("aidocsynth.services.text_pipeline.extract_direct", lambda *_: "TXT")
+    monkeypatch.setattr("aidocsynth.services.text_pipeline.ocr_text", lambda *_: "OCR")
     monkeypatch.setattr(
         "aidocsynth.services.providers.dummy_provider.DummyProvider._run",
         lambda self, p: json.dumps({"targetPath":"T","fileName":"x.txt"})
