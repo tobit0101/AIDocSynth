@@ -1,1 +1,12 @@
 .venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDE / Editor
+.idea/
+.vscode/
+*.swp
