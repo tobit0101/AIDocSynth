@@ -13,8 +13,16 @@ def get_default_work_dir() -> Path:
     return docs / "AIDocSynth"
 
 class LLMSettings(BaseModel):
-    provider: str = "openai"
+    provider: str = "openai"             # openai | azure | ollama
+    # OpenAI
     openai_api_key: str | None = None
+    # Azure OpenAI
+    azure_endpoint:  str | None = None
+    azure_deployment: str | None = None
+    azure_api_key:  str | None = None
+    # Ollama
+    ollama_host: str = "http://localhost:11434"
+    ollama_model: str = "llama3"
 
 class AppSettings(BaseModel):
     work_dir: Path = Field(default_factory=get_default_work_dir)

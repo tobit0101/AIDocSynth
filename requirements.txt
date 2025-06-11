@@ -24,3 +24,5 @@ pytest-qt
 
 typing_extensions==4.14.0
 urllib3==2.4.0
+ollama==0.5.1
+openai==1.86.0

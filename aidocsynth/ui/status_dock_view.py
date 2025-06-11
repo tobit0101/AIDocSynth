@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import (
-    QDockWidget, QWidget, QVBoxLayout, QTableView
+    QDockWidget, QWidget, QVBoxLayout, QTableView, QProgressBar, QLabel, QHBoxLayout
 )
 from PySide6.QtCore import QCoreApplication
 
@@ -22,6 +22,19 @@ class StatusDockView(QDockWidget):
         self.dockWidgetContents.setObjectName("dockWidgetContents")
         self.verticalLayout = QVBoxLayout(self.dockWidgetContents)
         self.verticalLayout.setObjectName("verticalLayout")
+        # Progress Area
+        progress_widget = QWidget()
+        progress_layout = QHBoxLayout(progress_widget)
+        progress_layout.setContentsMargins(0, 0, 0, 0)
+        self.lblJobStatus = QLabel("Ready")
+        self.prgJob = QProgressBar()
+        self.prgJob.setObjectName("prgJob")
+        self.prgJob.setRange(0, 100)
+        self.prgJob.setValue(0)
+        progress_layout.addWidget(self.lblJobStatus)
+        progress_layout.addWidget(self.prgJob, 1) # Add stretch factor
+        self.verticalLayout.addWidget(progress_widget)
+
         self.tblJobs = QTableView(self.dockWidgetContents)
         self.tblJobs.setObjectName("tblJobs")
         self.verticalLayout.addWidget(self.tblJobs)

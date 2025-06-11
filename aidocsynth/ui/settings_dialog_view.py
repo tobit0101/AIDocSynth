@@ -1,9 +1,8 @@
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QLineEdit, QComboBox, 
-    QDialogButtonBox, QGroupBox, QLabel, QTabWidget, QWidget
+    QDialogButtonBox, QGroupBox, QLabel, QTabWidget, QWidget, QStackedWidget
 )
-from aidocsynth.models.settings import settings
-from PySide6.QtCore import QCoreApplication
+from aidocsynth.services.settings_service import settings
 
 class SettingsDialogView(QDialog):
     """
@@ -17,7 +16,7 @@ class SettingsDialogView(QDialog):
 
     def _setup_ui(self):
         self.setWindowTitle("Einstellungen")
-        self.resize(450, 200)
+        self.resize(450, 300) # Adjusted size for more fields
         self.layout = QVBoxLayout(self)
 
         # Create and configure the tab widget
@@ -31,22 +30,60 @@ class SettingsDialogView(QDialog):
         # --- Setup KI Tab ---
         self.ki_layout = QVBoxLayout(self.tabKI)
         
-        self.llm_group_box = QGroupBox("LLM Provider")
-        self.llm_form_layout = QFormLayout()
+        # --- LLM Provider Group ---
+        llm_group_box = QGroupBox("LLM Provider")
+        llm_group_layout = QVBoxLayout(llm_group_box)
 
-        self.provider_combo = QComboBox()
-        self.provider_combo.addItems(["openai", "anthropic"]) # Example providers
-        self.llm_form_layout.addRow("Provider:", self.provider_combo)
+        # Provider selection
+        provider_form_layout = QFormLayout()
+        self.cmbProvider = QComboBox()
+        self.cmbProvider.setObjectName("cmbProvider")
+        self.cmbProvider.addItems(["openai", "azure", "ollama"])
+        provider_form_layout.addRow("Provider:", self.cmbProvider)
+        llm_group_layout.addLayout(provider_form_layout)
 
-        self.model_input = QLineEdit()
-        self.llm_form_layout.addRow("Model:", self.model_input)
+        # Provider-specific forms in a StackedWidget
+        self.stwProviderForms = QStackedWidget()
+        self.stwProviderForms.setObjectName("stwProviderForms")
 
-        self.api_key_input = QLineEdit()
-        self.api_key_input.setEchoMode(QLineEdit.Password)
-        self.llm_form_layout.addRow("API Key:", self.api_key_input)
-        
-        self.llm_group_box.setLayout(self.llm_form_layout)
-        self.ki_layout.addWidget(self.llm_group_box)
+        # Page 0: OpenAI
+        page_openai = QWidget()
+        layout_openai = QFormLayout(page_openai)
+        self.editOpenAIKey = QLineEdit()
+        self.editOpenAIKey.setObjectName("editOpenAIKey")
+        self.editOpenAIKey.setEchoMode(QLineEdit.Password)
+        layout_openai.addRow("API Key:", self.editOpenAIKey)
+        self.stwProviderForms.addWidget(page_openai)
+
+        # Page 1: Azure
+        page_azure = QWidget()
+        layout_azure = QFormLayout(page_azure)
+        self.editAzureEndpoint = QLineEdit()
+        self.editAzureEndpoint.setObjectName("editEndpoint") # Match instruction
+        self.editAzureDeployment = QLineEdit()
+        self.editAzureDeployment.setObjectName("editDeployment")
+        self.editAzureKey = QLineEdit()
+        self.editAzureKey.setObjectName("editAzureKey")
+        self.editAzureKey.setEchoMode(QLineEdit.Password)
+        layout_azure.addRow("Endpoint:", self.editAzureEndpoint)
+        layout_azure.addRow("Deployment:", self.editAzureDeployment)
+        layout_azure.addRow("API Key:", self.editAzureKey)
+        self.stwProviderForms.addWidget(page_azure)
+
+        # Page 2: Ollama
+        page_ollama = QWidget()
+        layout_ollama = QFormLayout(page_ollama)
+        self.editOHost = QLineEdit()
+        self.editOHost.setObjectName("editOHost")
+        self.cmbOllamaModel = QComboBox()
+        self.cmbOllamaModel.setObjectName("cmbOllamaModel")
+        self.cmbOllamaModel.setEditable(True)
+        layout_ollama.addRow("Host:", self.editOHost)
+        layout_ollama.addRow("Model:", self.cmbOllamaModel)
+        self.stwProviderForms.addWidget(page_ollama)
+
+        llm_group_layout.addWidget(self.stwProviderForms)
+        self.ki_layout.addWidget(llm_group_box)
         self.ki_layout.addStretch()
 
         # --- Setup Allgemein Tab ---
@@ -55,25 +92,41 @@ class SettingsDialogView(QDialog):
         self.allgemein_layout.addStretch()
 
         # --- Dialog Buttons ---
-        self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel | QDialogButtonBox.Apply)
         self.layout.addWidget(self.button_box)
 
         # --- Connect Signals ---
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
+        self.button_box.button(QDialogButtonBox.Apply).clicked.connect(self.save_settings)
 
     def load_settings(self):
         """Load settings from the manager and populate the UI fields."""
         s = settings.data.llm
-        self.provider_combo.setCurrentText(s.provider)
-        self.model_input.setText(s.model)
-        self.api_key_input.setText(s.api_key)
+        self.cmbProvider.setCurrentText(s.provider)
+        self.editOpenAIKey.setText(s.openai_api_key)
+        self.editAzureEndpoint.setText(s.azure_endpoint)
+        self.editAzureDeployment.setText(s.azure_deployment)
+        self.editAzureKey.setText(s.azure_api_key)
+        self.editOHost.setText(s.ollama_host)
+        # The controller will populate the model list, just set the current one
+        if s.ollama_model and not self.cmbOllamaModel.findText(s.ollama_model) > -1:
+             self.cmbOllamaModel.addItem(s.ollama_model)
+        self.cmbOllamaModel.setCurrentText(s.ollama_model)
+
+    def save_settings(self):
+        """Save settings from the UI fields to the manager."""
+        s = settings.data.llm
+        s.provider = self.cmbProvider.currentText()
+        s.openai_api_key = self.editOpenAIKey.text()
+        s.azure_endpoint = self.editAzureEndpoint.text()
+        s.azure_deployment = self.editAzureDeployment.text()
+        s.azure_api_key = self.editAzureKey.text()
+        s.ollama_host = self.editOHost.text()
+        s.ollama_model = self.cmbOllamaModel.currentText()
+        settings.save()
 
     def accept(self):
         """Save settings and close the dialog."""
-        s = settings.data.llm
-        s.provider = self.provider_combo.currentText()
-        s.model = self.model_input.text()
-        s.api_key = self.api_key_input.text()
-        settings.save()
+        self.save_settings()
         super().accept()

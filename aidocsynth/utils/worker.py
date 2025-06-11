@@ -7,6 +7,7 @@ class WorkerSignals(QObject):
     finished = Signal(object)
     error    = Signal(str)
     result   = Signal(object)
+    progress_updated = Signal(str)
 
 class Worker(QRunnable):
     def __init__(self, fn, *args, **kwargs):
@@ -16,8 +17,15 @@ class Worker(QRunnable):
 
     @Slot()
     def run(self):
-        """Executes the worker function, handling both sync and async functions."""
+        """Executes the worker function, handling both sync and async functions.
+        If the target function accepts a 'signals' keyword argument, the WorkerSignals instance is passed.
+        """
         try:
+            # Check if the target function expects a 'signals' argument
+            fn_params = inspect.signature(self.fn).parameters
+            if 'signals' in fn_params:
+                self.kwargs['signals'] = self.sig
+
             if inspect.iscoroutinefunction(self.fn):
                 # For async functions, run them in a new event loop
                 result = asyncio.run(self.fn(*self.args, **self.kwargs))

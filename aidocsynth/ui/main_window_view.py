@@ -1,4 +1,5 @@
 import sys
+import logging
 from PySide6.QtGui import QAction, QCloseEvent
 from PySide6.QtWidgets import (
     QMainWindow, QVBoxLayout, QFrame, QLabel, QProgressBar, QStatusBar, QWidget, QMenuBar, QApplication
@@ -17,6 +18,7 @@ class MainWindowView(QMainWindow):
     def __init__(self, controller, parent=None):
         super().__init__(parent)
         self.controller = controller
+        self.logger = logging.getLogger(self.__class__.__name__)
 
         self._setup_ui()
         self._create_actions()
@@ -67,8 +69,12 @@ class MainWindowView(QMainWindow):
                 self.dropFrame.setLayout(QVBoxLayout())
             self.drop_area = DropArea()
             self.dropFrame.layout().addWidget(self.drop_area)
+            self.drop_area.setEnabled(True) # Ensure drop_area is enabled
+            self.dropFrame.setEnabled(True) # Ensure dropFrame is enabled
+            self.dropFrame.setAcceptDrops(True) # Explicitly set accept drops
+            self.logger.info("DropArea and dropFrame configured and enabled.")
         else:
-            print("FATAL: QFrame with name 'dropFrame' not found in the UI.", file=sys.stderr)
+            self.logger.critical("QFrame with name 'dropFrame' not found in the UI.")
             self.drop_area = None
 
         # Create and add the status dock widget
@@ -88,6 +94,8 @@ class MainWindowView(QMainWindow):
         self.actionToggleStatusDock.setCheckable(True)
         self.actionToggleStatusDock.setChecked(True)
 
+        self.actionAbout = QAction(f"Über {QApplication.applicationName()}", self)
+
     def _create_menus(self):
         """Create the application's menu bar."""
         file_menu = self.menubar.addMenu("&Datei")
@@ -97,18 +105,29 @@ class MainWindowView(QMainWindow):
         view_menu = self.menubar.addMenu("&Ansicht")
         view_menu.addAction(self.actionToggleStatusDock)
 
+        # Help Menu (Standard on Windows/Linux, macOS handles 'About' often in App menu)
+        help_menu = self.menubar.addMenu("&Hilfe")
+        help_menu.addAction(self.actionAbout)
+
     def _connect_signals(self):
         """Connect signals and slots."""
         self.actionSettings.triggered.connect(self.open_settings_dialog)
         self.actionExit.triggered.connect(QApplication.instance().quit)
         self.actionToggleStatusDock.toggled.connect(self.status_dock.setVisible)
+        self.actionAbout.triggered.connect(self.controller.show_about_dialog)
         if self.drop_area:
             self.drop_area.filesDropped.connect(self.controller.handle_drop)
         self.controller.ocr_status_changed.connect(self.update_ocr_status)
+        self.controller.jobUpdated.connect(self.update_job_progress)
 
     def update_ocr_status(self, message):
         """Updates the OCR status label in the status bar."""
         self.ocr_status_label.setText(f"OCR-Status: {message}")
+
+    def update_job_progress(self, job):
+        """Updates the progress bar and status label for a job."""
+        self.status_dock.prgJob.setValue(job.progress)
+        self.status_dock.lblJobStatus.setText(f"{job.status.capitalize()}...")
 
     def open_settings_dialog(self):
         """Creates and shows the settings dialog."""

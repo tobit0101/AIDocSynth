@@ -1,8 +1,8 @@
 .venv/
 
 # Python
-__pycache__/
-*.pyc
+**/__pycache__/
+**/*.pyc
 *.pyo
 *.pyd
 
@@ -10,3 +10,11 @@ __pycache__/
 .idea/
 .vscode/
 *.swp
+
+# macOS
+.DS_Store
+
+# PyInstaller
+AIDocSynth.spec
+build/
+dist/

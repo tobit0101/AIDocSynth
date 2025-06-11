@@ -19,10 +19,12 @@ def test_pipeline_ocr(monkeypatch):
     pdf = temp / original_pdf_path.name
     shutil.copy2(original_pdf_path, pdf)
 
-    # Stub only the provider, not the OCR part
+    # Stub the provider at the point of use to ensure it's always mocked
+    mock_provider_instance = AsyncMock()
+    mock_provider_instance.classify_document = AsyncMock(return_value={"targetPath": "T", "fileName": "x.txt"})
     monkeypatch.setattr(
-        "aidocsynth.services.providers.dummy_provider.DummyProvider._run",
-        AsyncMock(return_value=json.dumps({"targetPath": "T", "fileName": "x.txt"}))
+        "aidocsynth.controllers.main_controller.get_provider",
+        lambda cfg: mock_provider_instance
     )
 
     # Run the pipeline synchronously for the test
@@ -56,10 +58,12 @@ def test_pipeline_ocr_on_image(monkeypatch):
     img_path = temp / original_image_path.name
     shutil.copy2(original_image_path, img_path)
 
-    # Stub only the provider, not the OCR part
+    # Stub the provider at the point of use to ensure it's always mocked
+    mock_provider_instance = AsyncMock()
+    mock_provider_instance.classify_document = AsyncMock(return_value={"targetPath": "T", "fileName": "x.txt"})
     monkeypatch.setattr(
-        "aidocsynth.services.providers.dummy_provider.DummyProvider._run",
-        AsyncMock(return_value=json.dumps({"targetPath": "T", "fileName": "x.txt"}))
+        "aidocsynth.controllers.main_controller.get_provider",
+        lambda cfg: mock_provider_instance
     )
 
     # Run the pipeline synchronously for the test

@@ -2,39 +2,73 @@ import torch
 import numpy as np
 from PIL import Image
 import fitz  # PyMuPDF
-from doctr.models import ocr_predictor, from_hub
+import logging
+from threading import Lock
 
 _MODEL = None
 _MODEL_ID = "Felix92/doctr-torch-parseq-multilingual-v1"
+_MODEL_LOCK = Lock()
 
-def initialize_ocr():
-    """Loads the OCR predictor and replaces its recognition model with a custom one."""
+logger = logging.getLogger(__name__)
+
+def initialize_ocr(signals=None):
+    """Loads the OCR predictor and replaces its recognition model with a custom one.
+    Optionally emits progress updates via the provided signals object.
+    """
+    if signals:
+        signals.progress_updated.emit("Initializing OCR engine...") # Initial status from service
+
+    # Import doctr components here to delay their loading until this function is called
+    from doctr.models import ocr_predictor, from_hub
+
     global _MODEL
-    if _MODEL is None:
-        print(f"Lade Standard-Predictor und ersetze reco_model mit: {_MODEL_ID}...")
-        try:
-            # 1. Load a standard pretrained predictor
-            _MODEL = ocr_predictor(pretrained=True)
-            
-            # 2. Load the custom recognition model from the hub
-            custom_reco_model = from_hub(_MODEL_ID)
+    with _MODEL_LOCK:
+        if _MODEL is None:
+            if signals:
+                signals.progress_updated.emit(f"Lade Standard-Predictor (Modell: {_MODEL_ID})...")
+            else:
+                logger.info(f"Lade Standard-Predictor und ersetze reco_model mit: {_MODEL_ID}...")
+            try:
+                # 1. Load a standard pretrained predictor
+                _MODEL = ocr_predictor(pretrained=True)
+                
+                # 2. Load the custom recognition model from the hub
+                custom_reco_model = from_hub(_MODEL_ID)
 
-            # 3. Replace the recognition model in the predictor
-            _MODEL.reco_model = custom_reco_model
+                # 3. Replace the recognition model in the predictor
+                _MODEL.reco_model = custom_reco_model
 
-            if torch.cuda.is_available():
-                print("CUDA verfügbar. Verschiebe Modell auf die GPU.")
-                _MODEL = _MODEL.to('cuda')
-            print("OCR-Predictor erfolgreich geladen und konfiguriert.")
-        except Exception as e:
-            print(f"Kritisches Problem beim Laden des Modells: {e}")
+                if torch.cuda.is_available():
+                    if signals:
+                        signals.progress_updated.emit("CUDA verfügbar. Verschiebe Modell auf die GPU...")
+                    else:
+                        logger.info("CUDA verfügbar. Verschiebe Modell auf die GPU.")
+                    _MODEL = _MODEL.to('cuda')
+                if signals:
+                    signals.progress_updated.emit("OCR-Predictor erfolgreich geladen und konfiguriert.")
+                else:
+                    logger.info("OCR-Predictor erfolgreich geladen und konfiguriert.")
+                # Explicitly send ready signal from here for successful model init
+                if signals:
+                    signals.progress_updated.emit("OCR model ready.") 
+            except Exception as e:
+                logger.error(f"Kritisches Problem beim Laden des Modells: {e}", exc_info=True)
+                if signals:
+                    signals.progress_updated.emit(f"OCR Init Error: {e}") # Send specific error
+                raise # Re-raise exception to trigger worker's error handling
+        else:
+            logger.info("OCR model already initialized. Skipping.")
+            if signals: # Also signal ready if already initialized
+                signals.progress_updated.emit("OCR model ready (already initialized).")
     return _MODEL
 
 SUPPORTED_IMG_EXT = (".png", ".jpg", ".jpeg", ".tiff")
 
-async def ocr_text(path: str, dpi: int = 300) -> str:
-    """Extracts text from a PDF or image file using the doctr OCR predictor."""
-    model = initialize_ocr()
+async def ocr_text(path: str, dpi: int = 300, signals=None) -> str:
+    """Extracts text from a PDF or image file using the doctr OCR predictor.
+    If 'signals' is provided, it's passed to initialize_ocr.
+    """
+    model = initialize_ocr(signals=signals)
     if not model:
         return ""
 
