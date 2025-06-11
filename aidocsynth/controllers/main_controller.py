@@ -82,39 +82,70 @@ class MainController(QObject):
         if self.active_jobs == 0:
             self.ocr_status_changed.emit("Bereit")
 
-    async def _pipeline(self, job):
-        cfg, src = settings.data, Path(job.path)
-        self.logger.info(f"[{src.name}] Starting pipeline...")
+    async def _update_job_progress(self, job, progress, status_message, log_message_prefix=""):
+        job.progress = progress
+        job.status = status_message
+        self.jobUpdated.emit(job)
+        if log_message_prefix:
+            src_name = Path(job.path).name
+            self.logger.info(f"[{src_name}] {log_message_prefix}: {status_message}...")
 
-        job.progress = 10; job.status = "backing up"; self.jobUpdated.emit(job)
-        self.logger.info(f"[{src.name}] 1/5: Backing up original file...")
-        backup_original(src, cfg)
+    async def _backup_file(self, job, src_path, config):
+        await self._update_job_progress(job, 10, "backing up", "1/5")
+        backup_original(src_path, config)
 
-        # In a real scenario, text extraction and OCR are separate steps.
-        # Here, we combine them for simplicity.
-        job.progress = 30; job.status = "extracting text"; self.jobUpdated.emit(job)
-        self.logger.info(f"[{src.name}] 2/5: Extracting text (OCR)..." )
+    async def _extract_text_ocr(self, job, src_path):
+        await self._update_job_progress(job, 30, "extracting text", "2/5")
         # Run the CPU-bound OCR task in a separate process to avoid blocking the event loop
         loop = asyncio.get_running_loop()
-        text = await loop.run_in_executor(self.process_pool, full_text, str(src))
-        job.progress = 50; job.status = "ocr complete"; self.jobUpdated.emit(job)
+        text = await loop.run_in_executor(self.process_pool, full_text, str(src_path))
+        await self._update_job_progress(job, 50, "ocr complete")
+        return text
 
-        job.progress = 70; job.status = "classifying"; self.jobUpdated.emit(job)
-        self.logger.info(f"[{src.name}] 3/5: Classifying document...")
-        data = await get_provider(cfg.llm).classify_document({"content": text})
-        self.logger.info(f"[{src.name}] -> Classification result: {data}")
+    async def _classify_document(self, job, text_content, config):
+        await self._update_job_progress(job, 70, "classifying", "3/5")
+        classification_data = await get_provider(config.llm).classify_document({"content": text_content})
+        src_name = Path(job.path).name
+        self.logger.info(f"[{src_name}] -> Classification result: {classification_data}")
+        return classification_data
 
-        job.progress = 90; job.status = "sorting"; self.jobUpdated.emit(job)
+    async def _sort_file(self, job, src_path, classification_data, config):
+        await self._update_job_progress(job, 90, "sorting", "4/5")
+        src_name = Path(job.path).name
         try:
-            self.logger.info(f"[{src.name}] 4/5: Sorting file to '{data['targetPath']}' as '{data['fileName']}'...")
-            copy_sorted(src, data["targetPath"], data["fileName"], cfg)
+            target_path = classification_data['targetPath']
+            file_name = classification_data['fileName']
+            self.logger.info(f"[{src_name}] Sorting file to '{target_path}' as '{file_name}'...")
+            copy_sorted(src_path, target_path, file_name, config)
             job.status = "done"
-            self.logger.info(f"[{src.name}] -> Success. Pipeline finished.")
+            self.logger.info(f"[{src_name}] -> Success. Pipeline finished.")
         except Exception as e:
-            self.logger.error(f"[{src.name}] -> Error during sorting: {e}. Moving to unsorted.", exc_info=True)
-            copy_unsorted(src, cfg)
+            self.logger.error(f"[{src_name}] -> Error during sorting: {e}. Moving to unsorted.", exc_info=True)
+            copy_unsorted(src_path, config)
             job.status = "error"
-            self.logger.info(f"[{src.name}] -> Finished with error.")
+            self.logger.info(f"[{src_name}] -> Finished with error.")
+        # Emit final job status update outside the try/except for clarity
+        self.jobUpdated.emit(job) # Ensure final status ('done' or 'error') is emitted
+
+    async def _pipeline(self, job):
+        config, src_path = settings.data, Path(job.path)
+        src_name = src_path.name
+        self.logger.info(f"[{src_name}] Starting pipeline...")
+
+        try:
+            await self._backup_file(job, src_path, config)
+            text_content = await self._extract_text_ocr(job, src_path)
+            classification_data = await self._classify_document(job, text_content, config)
+            await self._sort_file(job, src_path, classification_data, config)
+        except Exception as e:
+            # Catch any unexpected errors from the pipeline stages themselves
+            self.logger.error(f"[{src_name}] Critical pipeline failure: {e}", exc_info=True)
+            job.progress = 100 # Or some appropriate error progress
+            job.status = "pipeline error"
+            copy_unsorted(src_path, config) # Attempt to move to unsorted as a fallback
+            self.jobUpdated.emit(job)
+            self.logger.info(f"[{src_name}] -> Pipeline finished with critical error.")
+        
         return job
 
     def show_about_dialog(self):

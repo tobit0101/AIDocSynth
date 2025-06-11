@@ -28,14 +28,39 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller
 
+    - name: Show architecture (macOS only)
+      if: runner.os == 'macOS'
+      run: uname -m
+
+    - name: Set build flags (macOS only)
+      if: runner.os == 'macOS'
+      run: |
+        echo "ARCHFLAGS=-arch arm64" >> $GITHUB_ENV
+        echo "QT_MAC_WANTS_LAYER=1" >> $GITHUB_ENV
+
     - name: Compile Qt Resources
-      run: pyside6-rcc resources.qrc -o aidocsynth/ui/qrc_resources.py
+      run: pyside6-rcc aidocsynth/ui/resources.qrc -o aidocsynth/ui/qrc_resources.py
 
-    - name: Build with PyInstaller
+    - name: Build with PyInstaller (Release)
       run: pyinstaller --noconfirm AIDocSynth.spec
+      env:
+        PYI_MODE: release
 
-    - name: Archive artifact
+    - name: Package macOS Artifact
+      if: runner.os == 'macOS'
+      run: |
+        ditto -c -k --sequesterRsrc --keepParent dist/AIDocSynth.app "dist/AIDocSynth-${{ runner.os }}.zip"
+
+    - name: Archive Windows Artifact
+      if: runner.os == 'Windows'
       uses: actions/upload-artifact@v4
       with:
         name: AIDocSynth-${{ runner.os }}
-        path: dist/
+        path: dist/AIDocSynth/
+
+    - name: Archive macOS Artifact
+      if: runner.os == 'macOS'
+      uses: actions/upload-artifact@v4
+      with:
+        name: AIDocSynth-${{ runner.os }}
+        path: dist/AIDocSynth-${{ runner.os }}.zip

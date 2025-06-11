@@ -139,7 +139,7 @@ class MainWindowView(QMainWindow):
         """Updates the OCR status label and enables/disables the drop area."""
         self.ocr_status_label.setText(f"OCR-Status: {message}")
         # The final ready signal is just "Bereit"
-        is_ready = message == "Bereit"
+        is_ready = "Bereit" in message
         self.dropFrame.setEnabled(is_ready)
         self.logger.info(f"OCR status: '{message}', Drop frame enabled: {is_ready}")
 

@@ -8,15 +8,18 @@ IS_MAC = sys.platform == "darwin"
 IS_WIN = sys.platform == "win32"
 dev = os.getenv("PYI_MODE", "release") == "dev"
 
+# --- Data Collection Helpers ---
+pyside_plugins = collect_data_files("PySide6", subdir="plugins", include_py_files=False)
 a = Analysis(
     ['run.py'],
     pathex=[],
-    # --- Qt / PySide6 Plugins ---
-    binaries=collect_dynamic_libs("PySide6"),
+    # --- Qt / PySide6 Plugins & Shiboken --- 
+    binaries=collect_dynamic_libs("PySide6") + collect_dynamic_libs("shiboken6"),
     # --- Data Files ---
-    datas=collect_data_files("PySide6", subdir="plugins") +
-          [('aidocsynth/ui/resources', 'aidocsynth/ui/resources'),
-           ('aidocsynth/prompts', 'aidocsynth/prompts')],
+    datas=pyside_plugins + [
+        ('aidocsynth/ui/resources', 'aidocsynth/ui/resources'),
+        ('aidocsynth/prompts', 'aidocsynth/prompts')
+    ],
     # --- Hidden Imports ---
     hiddenimports=[
         'PySide6.QtSvg', 'PySide6.QtNetwork',
@@ -47,7 +50,7 @@ exe = EXE(
     upx=not dev,
     # --- Platform-specific settings ---
     runtime_tmpdir=None if IS_MAC else os.path.expanduser("~/.aidocsynth_cache"),
-    icon='aidocsynth/ui/resources/app_icon.ico' if IS_WIN else None,
+    icon='aidocsynth/ui/resources/app_icon.icns' if IS_MAC else 'aidocsynth/ui/resources/app_icon.ico',
     console=dev,
 )
 

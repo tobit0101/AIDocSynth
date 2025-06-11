@@ -98,9 +98,9 @@ def load_main_application(splash):
     # Callbacks for the OCR worker. These will update the status bar of the
     # already visible main window.
     def on_worker_finished():
-        # Signal that OCR is ready
-        if QApplication.instance() and QApplication.instance().main_controller:
-            QApplication.instance().main_controller.ocr_status_changed.emit("Ready")
+        # This is now handled by the signal from within the worker itself ("Bereit")
+        # so this explicit signal is no longer needed and causes conflicts.
+        pass
 
     def on_worker_error(error_message):
         logging.getLogger("AIDocSynth.OCRWorker").error(f"Worker Error: {error_message}")

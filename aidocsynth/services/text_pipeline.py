@@ -1,5 +1,9 @@
-from .text_pdf   import extract_direct
+import fitz
 from .ocr_service import ocr_text
+
+def extract_direct(path: str) -> str:
+    with fitz.open(path) as doc:
+        return "\n".join(p.get_text() for p in doc)
 
 def full_text(path: str) -> str:
     direct = extract_direct(path)
