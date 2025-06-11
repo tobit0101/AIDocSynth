@@ -74,6 +74,7 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/') # Nur bei Tags ausführen
     permissions:            # wichtig ab GitHub Enterprise ≥2023-10
       contents: write
 
