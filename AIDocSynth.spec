@@ -15,8 +15,8 @@ a = Analysis(
     binaries=collect_dynamic_libs("PySide6"),
     # --- Data Files ---
     datas=collect_data_files("PySide6", subdir="plugins") +
-          collect_data_files("aidocsynth/ui/resources", destdir="aidocsynth/ui/resources") +
-          collect_data_files("aidocsynth/prompts", destdir="aidocsynth/prompts"),
+          [('aidocsynth/ui/resources', 'aidocsynth/ui/resources'),
+           ('aidocsynth/prompts', 'aidocsynth/prompts')],
     # --- Hidden Imports ---
     hiddenimports=[
         'PySide6.QtSvg', 'PySide6.QtNetwork',
