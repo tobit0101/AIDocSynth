@@ -3,8 +3,7 @@
 > **Intelligente Dokumenten‑Assistentin für Ordnung ohne Aufwand**
 > *Automatisiert – Plattform‑unabhängig – Open Source*
 
-![Hero‑Bild – AIDocSynth in Aktion](docs/assets/hero_placeholder.png)
-*<– Platzhalter: hier später ein hero‑Screenshot oder animiertes GIF einfügen –>*
+![Hero‑Bild – AIDocSynth in Aktion](aidocsynth/ui/resources/AIDocSynth_Illustration.png)
 
 ---
 
