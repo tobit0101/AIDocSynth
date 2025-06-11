@@ -6,6 +6,8 @@ import signal
 import logging
 import os
 import time
+import asyncio
+
 
 # For macOS foreground activation
 if sys.platform == "darwin":
@@ -23,6 +25,7 @@ from .ui import qrc_resources
 from .ui.main_window_view import MainWindowView
 from .ui.settings_dialog_view import SettingsDialogView
 from .controllers.main_controller import MainController
+from .services.settings_service import settings
 from .controllers.settings_controller import SettingsController
 from .utils.worker import Worker
 
@@ -156,14 +159,37 @@ def main():
         QTimer.singleShot(0, force_foreground) # Run after event loop starts
 
     # --- Main UI Setup --- 
-    # Create the main controller
-    main_controller = MainController()
-    # Create the main window view and pass the controller to it
+    # Import services and models needed for dependency injection.
+    from .services.settings_service import settings
+
+    # --- Main UI Setup --- 
+    # Create the main controller, injecting the necessary dependencies.
+    # The view is set to None initially to break the circular dependency.
+    main_controller = MainController(
+        view=None, 
+        config_manager=settings
+    )
+    
+    # Create the main window view and pass the controller to it.
     main_window = MainWindowView(controller=main_controller)
+    
+    # Now, assign the created view back to the controller.
+    main_controller.view = main_window
     
     # Keep references on the app instance
     app.main_window = main_window
     app.main_controller = main_controller
+
+    def cleanup():
+        """Clean up resources."""
+        logging.info("Starting application cleanup...")
+        app.main_controller.close()
+
+
+
+        if app.tray_icon:
+            app.tray_icon.hide()
+        logging.info("Application cleanup finished.")
 
     # Show main window immediately
     logger.info("Showing main window.")
@@ -182,7 +208,7 @@ def main():
 
     # --- Graceful Shutdown ---
     # Ensure the process pool is closed when the application quits.
-    app.aboutToQuit.connect(main_controller.close)
+    app.aboutToQuit.connect(cleanup)
 
     logger.info("Starting Qt event loop.")
     exit_code = app.exec()

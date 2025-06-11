@@ -149,7 +149,9 @@ class MainWindowView(QMainWindow):
 
     def open_settings_dialog(self):
         """Creates and shows the settings dialog."""
+        from aidocsynth.controllers.settings_controller import SettingsController # Import here
         dialog = SettingsDialogView(self)
+        controller = SettingsController(dialog) # Instantiate controller
         dialog.exec()
 
     def closeEvent(self, event: QCloseEvent):

@@ -9,9 +9,9 @@ logger = logging.getLogger(__name__)
 class DummyProvider(ProviderBase):
     name = "openai"
 
-    async def _run(self, prompt: str) -> str:
+    async def _run(self, messages: list) -> str:
         """Simulates a non-blocking network call."""
-        logger.info("DummyProvider: Simulating network latency...")
+        logger.info(f"DummyProvider: Simulating network latency with messages: {messages}")
         await asyncio.sleep(2)  # Non-blocking sleep
         logger.info("DummyProvider: Simulation finished. Returning mock data.")
         return json.dumps({

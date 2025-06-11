@@ -4,22 +4,27 @@ import os
 from pathlib import Path
 from functools import partial
 from concurrent.futures import ProcessPoolExecutor
+
 from PySide6.QtCore import QObject, Signal, QThreadPool, Slot
-from aidocsynth.models.job import Job
-from aidocsynth.utils.worker     import Worker
-from aidocsynth.services.settings_service import settings
-from aidocsynth.services.file_manager     import backup_original, copy_sorted, copy_unsorted
-from aidocsynth.services.text_pipeline    import full_text
-from aidocsynth.services.providers.base   import get_provider
-from aidocsynth.ui.about_dialog_view import AboutDialogView
 from PySide6.QtWidgets import QApplication
+
+from aidocsynth.models.job import Job
+from aidocsynth.utils.worker import Worker
+from aidocsynth.services.settings_service import settings
+from aidocsynth.services.file_manager import backup_original, copy_sorted, copy_unsorted, get_directory_structure, sort_and_copy_document
+from aidocsynth.services.text_pipeline import full_text
+from aidocsynth.services.providers.base import get_provider
+from aidocsynth.services.classification_service import ClassificationService
+from aidocsynth.ui.about_dialog_view import AboutDialogView
 
 class MainController(QObject):
     jobAdded = Signal(Job); jobUpdated = Signal(Job)
     ocr_status_changed = Signal(str) # message
 
-    def __init__(self):
+    def __init__(self, view, config_manager):
         super().__init__()
+        self.view = view
+        self.config_manager = config_manager
         self.logger = logging.getLogger(self.__class__.__name__)
         self.pool = QThreadPool.globalInstance()
         # Limit workers to avoid starving the system, leave one core for UI/OS
@@ -37,6 +42,7 @@ class MainController(QObject):
     def handle_drop(self, paths):
         if not paths:
             return
+
         self.active_jobs += len(paths)
         self.logger.info(f"Received drop: {paths}, active jobs now: {self.active_jobs}")
         self.ocr_status_changed.emit(f"Verarbeite {len(paths)} Datei(en)...")
@@ -59,9 +65,11 @@ class MainController(QObject):
     @Slot(object)
     def update_job_on_success(self, job):
         """Handles successful worker completion."""
-        if job.status == "done":
+        # This slot is called when the worker's result signal is emitted.
+        # The job object is passed from the pipeline's return value.
+        if job:
             job.progress = 100
-        self.jobUpdated.emit(job)
+            self.jobUpdated.emit(job)
 
     def update_job_on_error(self, job, error):
         """Handles worker failure."""
@@ -90,9 +98,9 @@ class MainController(QObject):
             src_name = Path(job.path).name
             self.logger.info(f"[{src_name}] {log_message_prefix}: {status_message}...")
 
-    async def _backup_file(self, job, src_path, config):
+    async def _backup_file(self, job, src_path):
         await self._update_job_progress(job, 10, "backing up", "1/5")
-        backup_original(src_path, config)
+        backup_original(src_path, self.config_manager.data)
 
     async def _extract_text_ocr(self, job, src_path):
         await self._update_job_progress(job, 30, "extracting text", "2/5")
@@ -102,51 +110,67 @@ class MainController(QObject):
         await self._update_job_progress(job, 50, "ocr complete")
         return text
 
-    async def _classify_document(self, job, text_content, config):
+    async def _classify_document(self, job, text_content):
         await self._update_job_progress(job, 70, "classifying", "3/5")
-        classification_data = await get_provider(config.llm).classify_document({"content": text_content})
-        src_name = Path(job.path).name
-        self.logger.info(f"[{src_name}] -> Classification result: {classification_data}")
-        return classification_data
-
-    async def _sort_file(self, job, src_path, classification_data, config):
-        await self._update_job_progress(job, 90, "sorting", "4/5")
-        src_name = Path(job.path).name
+        llm_provider = None
         try:
-            target_path = classification_data['targetPath']
-            file_name = classification_data['fileName']
-            self.logger.info(f"[{src_name}] Sorting file to '{target_path}' as '{file_name}'...")
-            copy_sorted(src_path, target_path, file_name, config)
-            job.status = "done"
-            self.logger.info(f"[{src_name}] -> Success. Pipeline finished.")
-        except Exception as e:
-            self.logger.error(f"[{src_name}] -> Error during sorting: {e}. Moving to unsorted.", exc_info=True)
-            copy_unsorted(src_path, config)
-            job.status = "error"
-            self.logger.info(f"[{src_name}] -> Finished with error.")
-        # Emit final job status update outside the try/except for clarity
-        self.jobUpdated.emit(job) # Ensure final status ('done' or 'error') is emitted
+            # 1. Get a new provider instance for this job.
+            llm_provider = get_provider(self.config_manager.data.llm)
+
+            # 2. Instantiate classification service
+            classification_service = ClassificationService(llm_provider)
+
+            # 3. Get directory structure for the prompt context
+            work_dir = self.config_manager.data.work_dir
+            dir_tuples = get_directory_structure(str(work_dir))
+            # Format the directory structure with file counts for the prompt
+            directory_structure = [f"{path} ({count} files)" for path, count in dir_tuples]
+
+            # 4. Call the service to perform classification
+            classification_data = await classification_service.classify_document(
+                text_content=text_content,
+                file_path=job.path,
+                directory_structure=directory_structure
+            )
+
+            src_name = Path(job.path).name
+            self.logger.info(f"[{src_name}] -> Classification result: {classification_data}")
+            return classification_data
+        finally:
+            # 5. Ensure the provider's resources are closed for this job.
+            if llm_provider:
+                await llm_provider.close()
+
+    async def _sort_file(self, job, src_path, classification_data):
+        await self._update_job_progress(job, 90, "sorting", "4/5")
+        
+        # Delegate sorting to the file manager service
+        loop = asyncio.get_running_loop()
+        job.status = await loop.run_in_executor(
+            self.process_pool,
+            sort_and_copy_document, 
+            src_path, 
+            classification_data, 
+            self.config_manager.data
+        )
+        self.jobUpdated.emit(job)
 
     async def _pipeline(self, job):
-        config, src_path = settings.data, Path(job.path)
-        src_name = src_path.name
-        self.logger.info(f"[{src_name}] Starting pipeline...")
+        """The main processing pipeline for a single file."""
+        src_path = Path(job.path)
 
         try:
-            await self._backup_file(job, src_path, config)
+            await self._backup_file(job, src_path)
             text_content = await self._extract_text_ocr(job, src_path)
-            classification_data = await self._classify_document(job, text_content, config)
-            await self._sort_file(job, src_path, classification_data, config)
+            classification_data = await self._classify_document(job, text_content)
+            await self._sort_file(job, src_path, classification_data)
+
+            await self._update_job_progress(job, 100, "completed", "5/5")
+            return job
+
         except Exception as e:
-            # Catch any unexpected errors from the pipeline stages themselves
-            self.logger.error(f"[{src_name}] Critical pipeline failure: {e}", exc_info=True)
-            job.progress = 100 # Or some appropriate error progress
-            job.status = "pipeline error"
-            copy_unsorted(src_path, config) # Attempt to move to unsorted as a fallback
-            self.jobUpdated.emit(job)
-            self.logger.info(f"[{src_name}] -> Pipeline finished with critical error.")
-        
-        return job
+            self.logger.error(f"Pipeline failed for {src_path.name}: {e}", exc_info=True)
+            self.update_job_on_error(job, str(e))
 
     def show_about_dialog(self):
         """

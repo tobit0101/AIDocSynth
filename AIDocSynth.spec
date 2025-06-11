@@ -22,10 +22,12 @@ a = Analysis(
     ],
     # --- Hidden Imports ---
     hiddenimports=[
-        'PySide6.QtSvg', 'PySide6.QtNetwork',
-        *(['openai','httpx','anyio'] if os.getenv("INC_OPENAI", "true").lower() == "true" else []),
-        *(['azure'] if os.getenv("INC_AZURE", "true").lower() == "true" else []),
-        *(['ollama'] if os.getenv("INC_OLLAMA", "true").lower() == "true" else []),
+        'PySide6.QtSvg',
+        'PySide6.QtNetwork',
+        'openai',
+        'httpx',
+        'anyio',
+        'ollama',
     ],
     hookspath=[],
     hooksconfig={},
