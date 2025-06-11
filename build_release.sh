@@ -14,6 +14,6 @@ echo "📦 Starting release build..."
 
 # Run PyInstaller for a release build (PYI_MODE is not set)
 # --jobs=auto uses all available CPU cores to speed up the build.
-pyinstaller --noconfirm --distpath dist/release --workpath .build --jobs=auto AIDocSynth.spec
+pyinstaller --noconfirm --distpath dist/release --workpath .build AIDocSynth.spec
 
 echo "🎉 Release build complete. You can find the app in the 'dist/release' folder."

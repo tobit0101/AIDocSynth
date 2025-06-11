@@ -14,7 +14,6 @@
 echo "🚀 Starting development build..."
 
 # Set environment variable for the spec file and run PyInstaller
-# --jobs=auto uses all available CPU cores to speed up the build.
-PYI_MODE=dev pyinstaller --noconfirm --distpath dist/dev --workpath .build --jobs=auto AIDocSynth.spec
+PYI_MODE=dev pyinstaller --noconfirm --distpath dist/dev --workpath .build AIDocSynth.spec
 
 echo "✅ Development build complete. You can find the app in the 'dist/dev' folder."
