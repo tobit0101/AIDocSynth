@@ -12,6 +12,8 @@
 
 echo "📦 Starting release build..."
 
+pyside6-rcc resources.qrc -o aidocsynth/ui/qrc_resources.py
+
 # Run PyInstaller for a release build (PYI_MODE is not set)
 # --jobs=auto uses all available CPU cores to speed up the build.
 pyinstaller --noconfirm --distpath dist/release --workpath .build AIDocSynth.spec

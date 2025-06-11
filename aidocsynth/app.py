@@ -18,6 +18,8 @@ if sys.platform == "darwin":
             @staticmethod
             def currentApplication(): return None
 
+# Wichtig: Importiert die kompilierten Ressourcen (Icons, etc.)
+from .ui import qrc_resources
 from .ui.main_window_view import MainWindowView
 from .ui.settings_dialog_view import SettingsDialogView
 from .controllers.main_controller import MainController

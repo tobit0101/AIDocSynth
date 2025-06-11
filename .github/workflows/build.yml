@@ -28,6 +28,9 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller
 
+    - name: Compile Qt Resources
+      run: pyside6-rcc resources.qrc -o aidocsynth/ui/qrc_resources.py
+
     - name: Build with PyInstaller
       run: pyinstaller --noconfirm AIDocSynth.spec
 
