@@ -7,6 +7,17 @@ import time
 import os
 from pathlib import Path
 
+# For macOS foreground activation
+if sys.platform == "darwin":
+    try:
+        from Cocoa import NSRunningApplication, NSApplicationActivateIgnoringOtherApps
+    except ImportError:
+        print("pyobjc not installed, skipping macOS-specific activation.", file=sys.stderr)
+        # Define a dummy class to avoid NameError later
+        class NSRunningApplication:
+            @staticmethod
+            def currentApplication(): return None
+
 # Wichtig: Importiert die kompilierten Ressourcen (Icons, etc.)
 from .ui import qrc_resources
 from .ui.main_window_view import MainWindowView
@@ -107,6 +118,12 @@ def main():
     """
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
+
+    # On macOS, force the application to the foreground to ensure the splash screen is visible.
+    if sys.platform == "darwin" and NSRunningApplication.currentApplication() is not None:
+        def force_foreground():
+            NSRunningApplication.currentApplication().activateWithOptions_(NSApplicationActivateIgnoringOtherApps)
+        QTimer.singleShot(0, force_foreground)
 
     # Setup and show splash screen immediately
     # Load the splash screen image from the file system instead of resources
