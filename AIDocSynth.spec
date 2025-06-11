@@ -52,7 +52,7 @@ exe = EXE(
     upx=not dev,
     # --- Platform-specific settings ---
     runtime_tmpdir=None if IS_MAC else os.path.expanduser("~/.aidocsynth_cache"),
-    icon='aidocsynth/ui/resources/app_icon.icns' if IS_MAC else 'aidocsynth/ui/resources/app_icon.ico',
+    icon='aidocsynth/ui/resources/app_icon.icns' if IS_MAC else 'aidocsynth/ui/resources/app.ico',
     console=dev,
 )
 
