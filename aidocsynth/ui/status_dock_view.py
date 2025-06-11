@@ -12,6 +12,8 @@ class StatusDockView(QDockWidget):
         super().__init__(parent)
         self._setup_ui()
 
+
+
     def _setup_ui(self):
         # This code is migrated from the original status_dock.ui file
         if not self.objectName():

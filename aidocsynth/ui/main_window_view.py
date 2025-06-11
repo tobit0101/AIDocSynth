@@ -1,7 +1,7 @@
 import sys
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QCloseEvent
 from PySide6.QtWidgets import (
-    QMainWindow, QVBoxLayout, QFrame, QLabel, QProgressBar, QStatusBar, QWidget, QMenuBar
+    QMainWindow, QVBoxLayout, QFrame, QLabel, QProgressBar, QStatusBar, QWidget, QMenuBar, QApplication
 )
 from PySide6.QtCore import Qt, QSize, QCoreApplication
 
@@ -48,15 +48,11 @@ class MainWindowView(QMainWindow):
 
         self.statusbar = QStatusBar(self)
         self.statusbar.setObjectName("statusbar")
-        self.lblInfo = QLabel(self.statusbar)
-        self.lblInfo.setObjectName("lblInfo")
-        self.prgJob = QProgressBar(self.statusbar)
-        self.prgJob.setObjectName("prgJob")
-        self.prgJob.setValue(0)
-        self.prgJob.setTextVisible(False)
-        self.statusbar.addWidget(self.lblInfo)
-        self.statusbar.addWidget(self.prgJob)
         self.setStatusBar(self.statusbar)
+
+        # Add a permanent widget to the status bar for OCR status messages
+        self.ocr_status_label = QLabel()
+        self.statusbar.addPermanentWidget(self.ocr_status_label)
 
         # Explicitly create and set the menu bar for macOS compatibility
         self.menubar = QMenuBar(self)
@@ -80,8 +76,8 @@ class MainWindowView(QMainWindow):
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.status_dock)
 
     def _retranslate_ui(self):
+        # Set the main window title, this comment is to force re-compilation
         self.setWindowTitle(QCoreApplication.translate("MainWindow", "AIDocSynth", None))
-        self.lblInfo.setText(QCoreApplication.translate("MainWindow", "Bereit", None))
 
     def _create_actions(self):
         """Create the application's actions."""
@@ -104,12 +100,25 @@ class MainWindowView(QMainWindow):
     def _connect_signals(self):
         """Connect signals and slots."""
         self.actionSettings.triggered.connect(self.open_settings_dialog)
-        self.actionExit.triggered.connect(self.close)
+        self.actionExit.triggered.connect(QApplication.instance().quit)
         self.actionToggleStatusDock.toggled.connect(self.status_dock.setVisible)
         if self.drop_area:
             self.drop_area.filesDropped.connect(self.controller.handle_drop)
+        self.controller.ocr_status_changed.connect(self.update_ocr_status)
+
+    def update_ocr_status(self, message):
+        """Updates the OCR status label in the status bar."""
+        self.ocr_status_label.setText(f"OCR-Status: {message}")
 
     def open_settings_dialog(self):
         """Creates and shows the settings dialog."""
         dialog = SettingsDialogView(self)
         dialog.exec()
+
+    def closeEvent(self, event: QCloseEvent):
+        """
+        Override the close event to hide the window instead of closing it.
+        The application will keep running in the system tray.
+        """
+        event.ignore()
+        self.hide()

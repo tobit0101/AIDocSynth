@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from PySide6.QtCore import QObject, Signal, QThreadPool
+from PySide6.QtCore import QObject, Signal, QThreadPool, Slot
 from aidocsynth.models.job import Job
 from aidocsynth.utils.worker     import Worker
 from aidocsynth.services.settings_service import settings
@@ -10,13 +10,20 @@ from aidocsynth.services.providers.base   import get_provider
 
 class MainController(QObject):
     jobAdded = Signal(Job); jobUpdated = Signal(Job)
-    
+    ocr_status_changed = Signal(str)
+
     def __init__(self):
         super().__init__()
         self.pool = QThreadPool.globalInstance()
+        self.active_jobs = 0
         self.workers = set()
 
     def handle_drop(self, paths):
+        if not paths:
+            return
+        self.active_jobs += len(paths)
+        print(f"Controller received drop: {paths}, active jobs now: {self.active_jobs}")
+        self.ocr_status_changed.emit(f"Processing {len(paths)} file(s)...")
         for p in paths:
             job = Job(path=p)
             self.jobAdded.emit(job)
@@ -29,6 +36,14 @@ class MainController(QObject):
     def _on_worker_finished(self, worker, job):
         self.jobUpdated.emit(job)
         self.workers.remove(worker)
+        self.handle_job_completion()
+
+    @Slot()
+    def handle_job_completion(self):
+        self.active_jobs -= 1
+        print(f"Job completed, active jobs left: {self.active_jobs}")
+        if self.active_jobs == 0:
+            self.ocr_status_changed.emit("Ready")
 
     async def _pipeline(self, job):
         cfg, src = settings.data, Path(job.path)

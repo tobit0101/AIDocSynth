@@ -29,6 +29,18 @@ def setup_tray_icon(parent_app):
     tray_menu = QMenu()
     tray_menu.addAction("Beenden", parent_app.quit)
     tray_icon.setContextMenu(tray_menu)
+
+    def on_tray_activated(reason):
+        # Show the window on left-click
+        if reason == QSystemTrayIcon.ActivationReason.Trigger:
+            main_win = QApplication.instance().main_window
+            if main_win:
+                main_win.show()
+                main_win.raise_()
+                main_win.activateWindow()
+
+    tray_icon.activated.connect(on_tray_activated)
+
     tray_icon.show()
     return tray_icon
 
@@ -66,6 +78,9 @@ def load_main_application(splash):
 
     # This function ensures the splash is shown for a fixed delay after loading.
     def on_worker_finished():
+        # Signal that OCR is ready
+        QApplication.instance().main_controller.ocr_status_changed.emit("Ready")
+        
         # Always wait a fixed amount of time after loading is complete.
         fixed_delay_ms = 1500 # 1.5 seconds
         QTimer.singleShot(fixed_delay_ms, show_main_window)
@@ -75,6 +90,9 @@ def load_main_application(splash):
     pool = QThreadPool.globalInstance()
     worker = Worker(initialize_ocr)
     worker.sig.finished.connect(on_worker_finished)
+
+    # Emit initial status
+    ctrl.ocr_status_changed.emit("Initializing OCR model...")
 
     # Keep a reference to the worker to prevent it from being garbage collected
     # while the thread is running. This is a common pitfall in Qt+Python.
@@ -88,6 +106,7 @@ def main():
     main loading function via a timer to ensure the splash screen is shown first.
     """
     app = QApplication(sys.argv)
+    app.setQuitOnLastWindowClosed(False)
 
     # Setup and show splash screen immediately
     # Load the splash screen image from the file system instead of resources
