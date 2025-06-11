@@ -1,12 +1,13 @@
-name: Build Cross-Platform Binaries
+name: Build & Release AIDocSynth
 
 on:
   push:
-    tags:
-      - 'v*'
-  workflow_dispatch:
+    branches: [ main ]          # läuft bei Commits auf main
+    tags:     [ 'v*' ]          # …und bei getaggten Releases (v1.2.3)
+  workflow_dispatch:            # manuell startbar
 
 jobs:
+  # ---------- Build ----------
   build:
     strategy:
       matrix:
@@ -14,53 +15,87 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pyinstaller
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
 
-    - name: Show architecture (macOS only)
-      if: runner.os == 'macOS'
-      run: uname -m
+      # ----- macOS-spezifische Flags -----
+      - name: Show arch (macOS)
+        if: runner.os == 'macOS'
+        run: uname -m
 
-    - name: Set build flags (macOS only)
-      if: runner.os == 'macOS'
-      run: |
-        echo "ARCHFLAGS=-arch arm64" >> $GITHUB_ENV
-        echo "QT_MAC_WANTS_LAYER=1" >> $GITHUB_ENV
+      - name: Set build flags (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          echo "ARCHFLAGS=-arch arm64" >> $GITHUB_ENV
+          echo "QT_MAC_WANTS_LAYER=1" >> $GITHUB_ENV
 
-    - name: Compile Qt Resources
-      run: pyside6-rcc aidocsynth/ui/resources.qrc -o aidocsynth/ui/qrc_resources.py
+      # ---------- Build ----------
+      - name: Compile Qt resources
+        run: pyside6-rcc resources.qrc -o aidocsynth/ui/qrc_resources.py   # ← korrigierter Pfad
 
-    - name: Build with PyInstaller (Release)
-      run: pyinstaller --noconfirm AIDocSynth.spec
-      env:
-        PYI_MODE: release
+      - name: Build binary
+        run: pyinstaller --noconfirm AIDocSynth.spec
+        env:
+          PYI_MODE: release
 
-    - name: Package macOS Artifact
-      if: runner.os == 'macOS'
-      run: |
-        ditto -c -k --sequesterRsrc --keepParent dist/AIDocSynth.app "dist/AIDocSynth-${{ runner.os }}.zip"
+      # ---------- Paketieren ----------
+      - name: Zip App (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent \
+            dist/AIDocSynth.app dist/AIDocSynth-macOS.zip
 
-    - name: Archive Windows Artifact
-      if: runner.os == 'Windows'
-      uses: actions/upload-artifact@v4
-      with:
-        name: AIDocSynth-${{ runner.os }}
-        path: dist/AIDocSynth/
+      - name: Zip App (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          powershell Compress-Archive -Path dist/AIDocSynth/* `
+                                      -DestinationPath dist/AIDocSynth-Windows.zip
 
-    - name: Archive macOS Artifact
-      if: runner.os == 'macOS'
-      uses: actions/upload-artifact@v4
-      with:
-        name: AIDocSynth-${{ runner.os }}
-        path: dist/AIDocSynth-${{ runner.os }}.zip
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ runner.os }}-asset
+          path: |
+            dist/AIDocSynth-*.zip
+            dist/AIDocSynth/**      # falls zusätzliche Dateien
+
+  # ---------- Release ----------
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:            # wichtig ab GitHub Enterprise ≥2023-10
+      contents: write
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: ${{ github.ref_name }}   # Tag-Name oder Commit-SHA
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ./artifacts/*/*.zip      # alle gezippten Artefakte
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
