@@ -73,3 +73,15 @@ if IS_MAC:
             'NSHumanReadableCopyright': 'Copyright 2025 Tobias Müller. All rights reserved.'
         }
     )
+
+# --- Windows One-Dir-Build Output ---
+if IS_WIN:
+    coll = COLLECT(
+        exe,
+        a.binaries,
+        a.zipfiles,
+        a.datas,
+        strip=not dev,
+        upx=not dev,
+        name='AIDocSynth'
+    )
