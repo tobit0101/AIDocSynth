@@ -1,34 +1,134 @@
 # AIDocSynth
 
-Ein intelligentes Werkzeug zur Dokumentenverarbeitung, das Ihre Dateien mithilfe von KI automatisch klassifiziert, umbenennt und organisiert.
+> **Intelligente Dokumenten‑Assistentin für Ordnung ohne Aufwand**
+> *Automatisiert – Plattform‑unabhängig – Open Source*
 
-## Geplante Funktionen
+![Hero‑Bild – AIDocSynth in Aktion](docs/assets/hero_placeholder.png)
+*<– Platzhalter: hier später ein hero‑Screenshot oder animiertes GIF einfügen –>*
 
-- Drag & Drop-Oberfläche
-- OCR für gescannte Dokumente
-- LLM-basierte Klassifizierung (OpenAI, Azure, Ollama)
-- Extraktion und Einbettung von Metadaten
+---
 
-## Erste Schritte
+## Warum AIDocSynth?
 
-1.  **Repository klonen:**
-    ```bash
-    git clone https://github.com/tobit0101/AIDocSynth.git
-    cd AIDocSynth
-    ```
+Sammeln sich bei dir PDF‑Rechnungen, gescannte Belege oder Office‑Dateien an?
+AIDocSynth liest diese Dokumente, **versteht** ihren Inhalt dank KI und *sortiert, benennt und versieht sie mit Metadaten* – alles auf Knopfdruck oder per Drag‑&‑Drop.
 
-2.  **Umgebung einrichten:**
-    ```bash
-    python -m venv .venv
-    source .venv/bin/activate  # Unter Windows: .venv\Scripts\activate
-    ```
+* **Zeit sparen:** Keine manuelle Ablage mehr.
+* **Alles wiederfinden:** Konsistente Dateinamen & folder‑Struktur.
+* **Lokale Kontrolle:** Läuft komplett auf deinem Rechner – sensibel bleibt privat.
+* **Offen & erweiterbar:** Python‑Code, MIT‑Lizenz, Community‑Add‑ons willkommen!
 
-3.  **Abhängigkeiten installieren:**
-    ```bash
-    pip install -r requirements.txt
-    ```
+> *„Ich schiebe nur noch die PDFs aufs Icon – Sekunden später ist alles sortiert.“* – *Beta‑Tester*
 
-4.  **Anwendung starten:**
-    ```bash
-    python -m aidocsynth.app
-    ```
+---
+
+## Kern‑Features
+
+| Für alle                                                | Für Entwickler                                             |
+| ------------------------------------------------------- | ---------------------------------------------------------- |
+| 🖱️ Einfaches **Drag‑&‑Drop** in die App                | Modularer **Pipeline‑Aufbau** (Services, Provider, UI)     |
+| 🔎 **OCR** erkennt Text selbst in Scans                 | **LLM‑Abstraktionsschicht** (OpenAI, Azure, Ollama u.v.m.) |
+| 🤖 **KI‑Klassifizierung** wählt Zielordner & Dateiname  | **Pydantic‑Modelle** für strikte Datenvalidierung          |
+| 🏷️ **Metadaten** werden ins Dokument zurückgeschrieben | **pytest**‑Test‑Suite & Smoke‑Tests                        |
+| 📂 Automatische **Backups** & Versions‑Handling         | **PyInstaller**‑Spec für 1‑Klick‑Builds                    |
+
+---
+
+## Schnellstart (für Nicht‑Techniker)
+
+```bash
+# 1. Download:  Release‑ZIP oder Installer aus dem GitHub‑Reiter »Releases«
+# 2. Entpacken / Installieren  →  AIDocSynth starten
+# 3. PDF‑ oder Bild‑Dateien auf das Fenster ziehen … fertig! ✨
+```
+
+*Keine Python‑Kenntnisse nötig.*
+Für Offline‑KI empfiehlt sich ein lokaler **Ollama‑Server** (optional) – die App funktioniert aber auch ohne.
+
+---
+
+## Entwickler‑Setup
+
+```bash
+# Klonen
+git clone https://github.com/tobit0101/AIDocSynth.git && cd AIDocSynth
+
+# Virtuelle Umgebung
+python -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
+
+# Abhängigkeiten
+pip install -r requirements.txt
+
+# Dev‑Start (Hot‑Reload via `pytest -q`)
+python -m aidocsynth.app
+```
+
+### Ordnerstruktur (Kurz‑Überblick)
+
+```text
+AIDocSynth/
+├─ aidocsynth/           # Hauptpaket
+│  ├─ controllers/       # MVC‑Controller (UI‑Logik, Pipeline)
+│  ├─ models/            # Pydantic‑ & Dataclasses
+│  ├─ services/          # Funktionale Bausteine (OCR, LLM, File‑Ops …)
+│  ├─ ui/                # Qt‑Designer .ui oder Python‑Views
+│  └─ app.py             # Entry‑Point (Qt‑Application)
+├─ tests/                # pytest Smoke‑ & Unit‑Tests
+└─ build/                # PyInstaller‑Spec & Ressourcen
+```
+
+---
+
+## Architektur‑Überblick
+
+![Architektur‑Diagramm](docs/assets/architecture_placeholder.svg)
+*<– Platzhalter: hier folgt später ein Sequence‑ oder Component‑Diagramm –>*
+
+1. **DropArea → MainController** — nimmt Pfade entgegen, legt `Job` an.
+2. **Worker Thread** führt asynchrone **Pipeline** aus: Backup → Text‑Extraktion (direkt + OCR) → LLM‑Klassifizierung → Sortierung.
+3. **Provider‑Layer** abstrahiert OpenAI, Azure OpenAI, Ollama etc.
+4. **JobTableModel** aktualisiert UI in Echtzeit (Qt signals).
+
+---
+
+## Roadmap
+
+* [x] **MVP** mit OpenAI‑Workflow & Basis‑GUI
+* [ ] Wizard für Ersteinrichtung (API‑Keys, Ordnerwahl)
+* [ ] Automatische Überwachung eines »Eingang«‑Ordners
+* [ ] Mehrsprachige UI (i18n)
+* [ ] Plug‑in‑System für Custom‑Prompts & Metadaten‑Schemas
+
+Du hast Ideen? → **Issues** eröffnen oder **Pull Request** schicken!
+
+---
+
+## Contributing
+
+1. Fork das Repo und erstelle einen Branch (`feature/xyz`).
+2. Halte dich an [Conventional Commits](https://www.conventionalcommits.org/) & Projekt‑Linting.
+3. Führe `pytest` aus – alle Tests müssen grün sein.
+4. Öffne einen Pull Request – wir freuen uns! 💚
+
+---
+
+## Sicherheit & Privatsphäre
+
+* **On‑Device OCR** (doctr) → keine Cloud‑Uploads nötig.
+* **LLM Provider frei wählbar** – verwende lokale Modelle für maximale DSGVO‑Konformität.
+* Open Source ⇢ voll einsehbar & auditierbar.
+
+---
+
+## Lizenz
+
+AIDocSynth steht unter der **MIT‑Lizenz**.
+Siehe [LICENSE](LICENSE) für Details.
+
+---
+
+## Kontakt & Community
+
+* **Issues / Discussions:** [github.com/tobit0101/AIDocSynth](https://github.com/tobit0101/AIDocSynth)
+
+> *Made with ♥ in Baden‑Württemberg*

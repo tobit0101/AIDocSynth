@@ -2,10 +2,13 @@ from PySide6.QtCore import QStandardPaths
 from pydantic import BaseModel, Field
 from pathlib import Path
 import yaml
+import logging
 
 # This call is safe as it doesn't require a QApplication instance
 CFG_DIR = Path(QStandardPaths.writableLocation(QStandardPaths.AppConfigLocation)) / "AIDocSynth"
 CFG_FILE = CFG_DIR / "config.yaml"
+
+logger = logging.getLogger(__name__)
 
 def get_default_work_dir() -> Path:
     """Gets the default working directory, delaying the QStandardPaths call."""
@@ -51,7 +54,7 @@ class SettingsManager:
                     # model_validate will call model_post_init
                     self.data = AppSettings.model_validate(yaml.safe_load(f) or {})
             except Exception as e:
-                print(f"Could not load settings: {e}. Using defaults.")
+                logger.warning(f"Could not load settings: {e}. Using defaults.")
                 self.data = AppSettings()
 
     def save(self):

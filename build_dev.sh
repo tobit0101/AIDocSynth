@@ -1,0 +1,20 @@
+#!/bin/bash
+#
+# Development Build Script for AIDocSynth
+#
+# This script creates a non-optimized, debug-friendly build.
+# - Faster build time
+# - Console window is visible
+# - Not compressed with UPX
+# - No lazy imports
+#
+# Output directory: dist/dev
+#
+
+echo "🚀 Starting development build..."
+
+# Set environment variable for the spec file and run PyInstaller
+# --jobs=auto uses all available CPU cores to speed up the build.
+PYI_MODE=dev pyinstaller --noconfirm --distpath dist/dev --workpath .build --jobs=auto AIDocSynth.spec
+
+echo "✅ Development build complete. You can find the app in the 'dist/dev' folder."

@@ -2,12 +2,13 @@ from PySide6.QtCore import QObject, QRunnable, Signal, Slot
 import asyncio
 import inspect
 import traceback
+import logging
 
 class WorkerSignals(QObject):
     finished = Signal(object)
-    error    = Signal(str)
+    error    = Signal(Exception) 
     result   = Signal(object)
-    progress_updated = Signal(str)
+    progress_updated = Signal(str) # message
 
 class Worker(QRunnable):
     def __init__(self, fn, *args, **kwargs):
@@ -33,9 +34,9 @@ class Worker(QRunnable):
                 # For sync functions, run them directly
                 result = self.fn(*self.args, **self.kwargs)
         except Exception as e:
-            traceback.print_exc()
+            logging.exception("Error in worker thread")
             try:
-                self.sig.error.emit(str(e))
+                self.sig.error.emit(e)
             except RuntimeError:
                 pass  # Signal source might be deleted
         else:

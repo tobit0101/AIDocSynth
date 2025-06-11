@@ -1,7 +1,10 @@
 from PySide6.QtCore import QObject
+import logging
 from aidocsynth.services.settings_service import settings
 from aidocsynth.services.providers.ollama_provider import OllamaProvider
 import asyncio
+
+logger = logging.getLogger(__name__)
 
 class SettingsController(QObject):
     def __init__(self, dlg):
@@ -21,7 +24,7 @@ class SettingsController(QObject):
         try:
             models = await prov.list_models()
         except Exception as e:
-            print(f"Could not load Ollama models: {e}")
+            logger.error(f"Could not load Ollama models: {e}", exc_info=True)
             models = []
         self.dlg.cmbOllamaModel.clear()
         self.dlg.cmbOllamaModel.addItems(models or ["llama3"])

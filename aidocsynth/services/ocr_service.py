@@ -1,7 +1,3 @@
-import torch
-import numpy as np
-from PIL import Image
-import fitz  # PyMuPDF
 import logging
 from threading import Lock
 
@@ -15,8 +11,9 @@ def initialize_ocr(signals=None):
     """Loads the OCR predictor and replaces its recognition model with a custom one.
     Optionally emits progress updates via the provided signals object.
     """
+    import torch # Lazy import
     if signals:
-        signals.progress_updated.emit("Initializing OCR engine...") # Initial status from service
+        signals.progress_updated.emit("Initialisiere OCR-Engine...")
 
     # Import doctr components here to delay their loading until this function is called
     from doctr.models import ocr_predictor, from_hub
@@ -25,7 +22,7 @@ def initialize_ocr(signals=None):
     with _MODEL_LOCK:
         if _MODEL is None:
             if signals:
-                signals.progress_updated.emit(f"Lade Standard-Predictor (Modell: {_MODEL_ID})...")
+                signals.progress_updated.emit(f"Lade Standard-Predictor...")
             else:
                 logger.info(f"Lade Standard-Predictor und ersetze reco_model mit: {_MODEL_ID}...")
             try:
@@ -40,17 +37,17 @@ def initialize_ocr(signals=None):
 
                 if torch.cuda.is_available():
                     if signals:
-                        signals.progress_updated.emit("CUDA verfügbar. Verschiebe Modell auf die GPU...")
+                        signals.progress_updated.emit("Verschiebe Modell auf die GPU...")
                     else:
                         logger.info("CUDA verfügbar. Verschiebe Modell auf die GPU.")
                     _MODEL = _MODEL.to('cuda')
                 if signals:
-                    signals.progress_updated.emit("OCR-Predictor erfolgreich geladen und konfiguriert.")
+                    signals.progress_updated.emit("OCR-Predictor konfiguriert.")
                 else:
                     logger.info("OCR-Predictor erfolgreich geladen und konfiguriert.")
                 # Explicitly send ready signal from here for successful model init
                 if signals:
-                    signals.progress_updated.emit("OCR model ready.") 
+                    signals.progress_updated.emit("Bereit") 
             except Exception as e:
                 logger.error(f"Kritisches Problem beim Laden des Modells: {e}", exc_info=True)
                 if signals:
@@ -59,15 +56,19 @@ def initialize_ocr(signals=None):
         else:
             logger.info("OCR model already initialized. Skipping.")
             if signals: # Also signal ready if already initialized
-                signals.progress_updated.emit("OCR model ready (already initialized).")
+                signals.progress_updated.emit("Bereit (bereits initialisiert).")
     return _MODEL
 
 SUPPORTED_IMG_EXT = (".png", ".jpg", ".jpeg", ".tiff")
 
-async def ocr_text(path: str, dpi: int = 300, signals=None) -> str:
+def ocr_text(path: str, dpi: int = 300, signals=None) -> str:
     """Extracts text from a PDF or image file using the doctr OCR predictor.
     If 'signals' is provided, it's passed to initialize_ocr.
     """
+    import fitz  # PyMuPDF
+    import numpy as np
+    from PIL import Image
+
     model = initialize_ocr(signals=signals)
     if not model:
         return ""
@@ -100,5 +101,5 @@ async def ocr_text(path: str, dpi: int = 300, signals=None) -> str:
         return result.render()
 
     except Exception as e:
-        print(f"Fehler bei der Verarbeitung von '{path}': {e}")
+        logger.error(f"Fehler bei der Verarbeitung von '{path}': {e}", exc_info=True)
         return ""

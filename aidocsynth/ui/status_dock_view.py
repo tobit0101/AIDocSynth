@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (
     QDockWidget, QWidget, QVBoxLayout, QTableView, QProgressBar, QLabel, QHBoxLayout
 )
-from PySide6.QtCore import QCoreApplication
+from PySide6.QtCore import QCoreApplication, Slot
 
 class StatusDockView(QDockWidget):
     """
@@ -12,7 +12,11 @@ class StatusDockView(QDockWidget):
         super().__init__(parent)
         self._setup_ui()
 
-
+    @Slot(object)
+    def update_job_progress(self, job):
+        """Updates the progress bar and status label for a single job."""
+        self.prgJob.setValue(job.progress)
+        self.lblJobStatus.setText(f"{job.status.capitalize()}...")
 
     def _setup_ui(self):
         # This code is migrated from the original status_dock.ui file

@@ -2,9 +2,9 @@ import sys
 import logging
 from PySide6.QtGui import QAction, QCloseEvent
 from PySide6.QtWidgets import (
-    QMainWindow, QVBoxLayout, QFrame, QLabel, QProgressBar, QStatusBar, QWidget, QMenuBar, QApplication
+    QMainWindow, QVBoxLayout, QFrame, QLabel, QStatusBar, QWidget, QMenuBar, QApplication
 )
-from PySide6.QtCore import Qt, QSize, QCoreApplication
+from PySide6.QtCore import Qt, QSize, QCoreApplication, Slot
 
 from .drop_area import DropArea
 from .status_dock_view import StatusDockView
@@ -43,6 +43,19 @@ class MainWindowView(QMainWindow):
         self.dropFrame.setAcceptDrops(True)
         self.dropFrame.setFrameShape(QFrame.StyledPanel)
         self.dropFrame.setFrameShadow(QFrame.Raised)
+
+        # Add a stylesheet to visually indicate the disabled state
+        self.dropFrame.setStyleSheet("""
+            QFrame#dropFrame[enabled="false"] {
+                background-color: #f0f0f0; /* Light gray background when disabled */
+                border: 2px dashed #d0d0d0;
+            }
+            QFrame#dropFrame[enabled="true"] {
+                background-color: #ffffff; /* White background when enabled */
+                border: 2px dashed #a0a0a0;
+            }
+        """)
+
         self.verticalLayout_2 = QVBoxLayout(self.dropFrame)
         self.verticalLayout_2.setObjectName("verticalLayout_2")
         self.verticalLayout.addWidget(self.dropFrame)
@@ -69,10 +82,11 @@ class MainWindowView(QMainWindow):
                 self.dropFrame.setLayout(QVBoxLayout())
             self.drop_area = DropArea()
             self.dropFrame.layout().addWidget(self.drop_area)
-            self.drop_area.setEnabled(True) # Ensure drop_area is enabled
-            self.dropFrame.setEnabled(True) # Ensure dropFrame is enabled
+            # self.drop_area.setEnabled(True) # Ensure drop_area is enabled
+            # self.dropFrame.setEnabled(True) # Ensure dropFrame is enabled
+            self.dropFrame.setEnabled(False) # Initially disabled
             self.dropFrame.setAcceptDrops(True) # Explicitly set accept drops
-            self.logger.info("DropArea and dropFrame configured and enabled.")
+            self.logger.info("DropArea and dropFrame configured and initially disabled.")
         else:
             self.logger.critical("QFrame with name 'dropFrame' not found in the UI.")
             self.drop_area = None
@@ -118,16 +132,20 @@ class MainWindowView(QMainWindow):
         if self.drop_area:
             self.drop_area.filesDropped.connect(self.controller.handle_drop)
         self.controller.ocr_status_changed.connect(self.update_ocr_status)
-        self.controller.jobUpdated.connect(self.update_job_progress)
+        self.controller.jobUpdated.connect(self.status_dock.update_job_progress)
 
+    @Slot(str)
     def update_ocr_status(self, message):
-        """Updates the OCR status label in the status bar."""
+        """Updates the OCR status label and enables/disables the drop area."""
         self.ocr_status_label.setText(f"OCR-Status: {message}")
+        # The final ready signal is just "Bereit"
+        is_ready = message == "Bereit"
+        self.dropFrame.setEnabled(is_ready)
+        self.logger.info(f"OCR status: '{message}', Drop frame enabled: {is_ready}")
 
     def update_job_progress(self, job):
         """Updates the progress bar and status label for a job."""
-        self.status_dock.prgJob.setValue(job.progress)
-        self.status_dock.lblJobStatus.setText(f"{job.status.capitalize()}...")
+        self.status_dock.update_job_progress(job)
 
     def open_settings_dialog(self):
         """Creates and shows the settings dialog."""

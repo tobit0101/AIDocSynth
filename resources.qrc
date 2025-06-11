@@ -1,5 +1,0 @@
-<RCC>
-  <qresource prefix="/">
-        <file alias="spinner.gif">aidocsynth/ui/resources/spinner.gif</file>
-  </qresource>
-</RCC>

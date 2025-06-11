@@ -15,6 +15,5 @@
 .DS_Store
 
 # PyInstaller
-AIDocSynth.spec
 build/
 dist/

@@ -1,6 +1,9 @@
-import json
 import logging
+import asyncio
+import os
 from pathlib import Path
+from functools import partial
+from concurrent.futures import ProcessPoolExecutor
 from PySide6.QtCore import QObject, Signal, QThreadPool, Slot
 from aidocsynth.models.job import Job
 from aidocsynth.utils.worker     import Worker
@@ -13,43 +16,71 @@ from PySide6.QtWidgets import QApplication
 
 class MainController(QObject):
     jobAdded = Signal(Job); jobUpdated = Signal(Job)
-    ocr_status_changed = Signal(str)
+    ocr_status_changed = Signal(str) # message
 
     def __init__(self):
         super().__init__()
         self.logger = logging.getLogger(self.__class__.__name__)
         self.pool = QThreadPool.globalInstance()
+        # Limit workers to avoid starving the system, leave one core for UI/OS
+        max_proc = max(1, os.cpu_count() - 1)
+        self.process_pool = ProcessPoolExecutor(max_workers=max_proc)
         self.active_jobs = 0
         self.workers = set()
+
+    def close(self):
+        """Shuts down the process pool gracefully on application exit."""
+        self.logger.info("Shutting down process pool...")
+        # Use wait=False and cancel_futures=True (Python 3.9+) to avoid blocking exit
+        self.process_pool.shutdown(wait=False, cancel_futures=True)
 
     def handle_drop(self, paths):
         if not paths:
             return
         self.active_jobs += len(paths)
         self.logger.info(f"Received drop: {paths}, active jobs now: {self.active_jobs}")
-        self.ocr_status_changed.emit(f"Processing {len(paths)} file(s)...")
+        self.ocr_status_changed.emit(f"Verarbeite {len(paths)} Datei(en)...")
         for p in paths:
             job = Job(path=p)
             self.jobAdded.emit(job)
             worker = Worker(self._pipeline, job)
-            # Connect to the result signal, which will carry the completed job object
-            worker.sig.result.connect(lambda result, w=worker: self._on_worker_finished(w, result))
+
+            # --- Robust Signal Handling ---
+            # result: carries the completed job object on success
+            # error: carries the exception on failure
+            # finished: always emitted, used for cleanup
+            worker.sig.result.connect(self.update_job_on_success)
+            worker.sig.error.connect(partial(self.update_job_on_error, job))
+            worker.sig.finished.connect(lambda _, w=worker: self._cleanup_after_worker(w))
+
             self.workers.add(worker)
             self.pool.start(worker)
 
-    def _on_worker_finished(self, worker, job):
+    @Slot(object)
+    def update_job_on_success(self, job):
+        """Handles successful worker completion."""
         if job.status == "done":
             job.progress = 100
         self.jobUpdated.emit(job)
-        self.workers.remove(worker)
-        self.handle_job_completion()
 
-    @Slot()
-    def handle_job_completion(self):
+    def update_job_on_error(self, job, error):
+        """Handles worker failure."""
+        self.logger.error(f"Pipeline for job {job.path} failed.", exc_info=True)
+        job.status = "error"
+        self.jobUpdated.emit(job)
+
+    def _cleanup_after_worker(self, worker):
+        """Removes worker from the active set and decrements job counter."""
+        if worker in self.workers:
+            self.workers.remove(worker)
+        self._decrement_active_jobs()
+
+    def _decrement_active_jobs(self):
+        """Decrements the counter for active jobs and updates status if all are done."""
         self.active_jobs -= 1
-        self.logger.info(f"Job completed, active jobs left: {self.active_jobs}")
+        self.logger.info(f"Job beendet, {self.active_jobs} aktive Jobs übrig")
         if self.active_jobs == 0:
-            self.ocr_status_changed.emit("Ready")
+            self.ocr_status_changed.emit("Bereit")
 
     async def _pipeline(self, job):
         cfg, src = settings.data, Path(job.path)
@@ -63,7 +94,9 @@ class MainController(QObject):
         # Here, we combine them for simplicity.
         job.progress = 30; job.status = "extracting text"; self.jobUpdated.emit(job)
         self.logger.info(f"[{src.name}] 2/5: Extracting text (OCR)..." )
-        text = await full_text(src)
+        # Run the CPU-bound OCR task in a separate process to avoid blocking the event loop
+        loop = asyncio.get_running_loop()
+        text = await loop.run_in_executor(self.process_pool, full_text, str(src))
         job.progress = 50; job.status = "ocr complete"; self.jobUpdated.emit(job)
 
         job.progress = 70; job.status = "classifying"; self.jobUpdated.emit(job)
