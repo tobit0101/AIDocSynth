@@ -166,7 +166,6 @@ def main():
     # Create the main controller, injecting the necessary dependencies.
     # The view is set to None initially to break the circular dependency.
     main_controller = MainController(
-        view=None, 
         config_manager=settings
     )
     

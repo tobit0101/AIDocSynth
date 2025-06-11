@@ -18,7 +18,7 @@ class AzureProvider(ProviderBase):
         self.cli = AsyncAzureOpenAI(
             azure_endpoint=cfg.azure_endpoint,
             api_key=cfg.azure_api_key,
-            api_version="2024-02-01" 
+            api_version=cfg.azure_api_version
         )
         self.deployment = cfg.azure_deployment
 

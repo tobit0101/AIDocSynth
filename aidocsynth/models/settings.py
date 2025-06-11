@@ -19,10 +19,12 @@ class LLMSettings(BaseModel):
     provider: str = "openai"             # openai | azure | ollama
     # OpenAI
     openai_api_key: str | None = None
+    openai_model: str = "gpt-4o-mini"
     # Azure OpenAI
     azure_endpoint:  str | None = None
     azure_deployment: str | None = None
     azure_api_key:  str | None = None
+    azure_api_version: str = "2024-02-01"
     # Ollama
     ollama_host: str = "http://localhost:11434"
     ollama_model: str = "llama3"

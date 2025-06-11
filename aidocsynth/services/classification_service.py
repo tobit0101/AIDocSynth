@@ -56,21 +56,6 @@ class ClassificationService:
         self.logger.debug(f"System Prompt:\n{system_prompt}")
         self.logger.debug(f"User Prompt for {file_name_string}:\n{user_prompt}")
 
-        # This part needs to align with how providers handle system/user prompts.
-        # Assuming providers will be updated to accept a dict like:
-        # { "system_prompt": system_prompt, "user_prompt": user_prompt }
-        # Or a messages list: 
-        # messages = [
-        #     {"role": "system", "content": system_prompt},
-        #     {"role": "user", "content": user_prompt}
-        # ]
-        # For now, let's prepare a dictionary that providers might expect.
-        prompt_data = {
-            "system_prompt": system_prompt,
-            "user_prompt": user_prompt,
-            "raw_content": text_content # Keep if some providers still use it directly
-        }
-
         try:
             classification_data = await self.llm_provider.classify_document(
                 system_prompt=system_prompt,
@@ -82,36 +67,3 @@ class ClassificationService:
             self.logger.error(f"Error during document classification for {file_name_string}: {e}", exc_info=True)
             # Fallback or error structure
             return {"error": "Classification failed", "details": str(e)}
-
-# Example usage (for testing, not part of the actual service integration yet):
-# async def main():
-#     # This is a mock provider for testing purposes.
-#     class MockLLMProvider:
-#         async def classify_document(self, prompt_data: Dict[str, Any]) -> str:
-#             print("MockLLMProvider received prompt_data:", prompt_data.get('user_prompt'))
-#             # Simulate LLM returning a JSON string
-#             return json.dumps({
-#                 "headline": "test_headline",
-#                 "label": "test_label",
-#                 "context": "This is a test document.",
-#                 "yyyymmdd": "20240101",
-#                 "document_type": "test_type",
-#                 "main_party": "test_party",
-#                 "keywords": ["test", "document"],
-#                 "targetPath": "Test/Path/Here",
-#                 "fileName": "test_headline_20240101_test_label.txt"
-#             })
-
-#     provider = MockLLMProvider()
-#     service = ClassificationService(llm_provider=provider, prompts_base_path="../../prompts") # Adjust path for local test
-    
-#     test_content = "This is the main content of the test document."
-#     test_file_path = "/path/to/some/test_document.pdf"
-#     result = await service.classify_document(test_content, test_file_path)
-#     print("Classification Result:", result)
-
-# if __name__ == "__main__":
-#     import asyncio
-#     # Configure logging for testing
-#     logging.basicConfig(level=logging.DEBUG)
-#     asyncio.run(main())

@@ -89,8 +89,11 @@ class SettingsDialogView(QDialog):
         layout_openai.addWidget(QLabel("API Key:"))
         self.editOpenAIKey = QLineEdit()
         self.editOpenAIKey.setObjectName("editOpenAIKey")
-        self.editOpenAIKey.setEchoMode(QLineEdit.Password)
         layout_openai.addWidget(self.editOpenAIKey)
+        layout_openai.addWidget(QLabel("Model:"))
+        self.editOpenAIModel = QLineEdit()
+        self.editOpenAIModel.setObjectName("editOpenAIModel")
+        layout_openai.addWidget(self.editOpenAIModel)
         self.stwProviderForms.addWidget(page_openai)
 
         # Page 1: Azure
@@ -110,6 +113,10 @@ class SettingsDialogView(QDialog):
         self.editAzureKey.setObjectName("editAzureKey")
         self.editAzureKey.setEchoMode(QLineEdit.Password)
         layout_azure.addWidget(self.editAzureKey)
+        layout_azure.addWidget(QLabel("API Version:"))
+        self.editAzureApiVersion = QLineEdit()
+        self.editAzureApiVersion.setObjectName("editAzureApiVersion")
+        layout_azure.addWidget(self.editAzureApiVersion)
         self.stwProviderForms.addWidget(page_azure)
 
         # Page 2: Ollama
@@ -153,9 +160,11 @@ class SettingsDialogView(QDialog):
         llm_s = settings.data.llm
         self.cmbProvider.setCurrentText(llm_s.provider)
         self.editOpenAIKey.setText(llm_s.openai_api_key)
+        self.editOpenAIModel.setText(llm_s.openai_model)
         self.editAzureEndpoint.setText(llm_s.azure_endpoint)
         self.editAzureDeployment.setText(llm_s.azure_deployment)
         self.editAzureKey.setText(llm_s.azure_api_key)
+        self.editAzureApiVersion.setText(llm_s.azure_api_version)
         self.editOHost.setText(llm_s.ollama_host)
         
         # The controller will populate the model list, just set the current one
@@ -175,9 +184,11 @@ class SettingsDialogView(QDialog):
         llm_s = settings.data.llm
         llm_s.provider = self.cmbProvider.currentText()
         llm_s.openai_api_key = self.editOpenAIKey.text()
+        llm_s.openai_model = self.editOpenAIModel.text()
         llm_s.azure_endpoint = self.editAzureEndpoint.text()
         llm_s.azure_deployment = self.editAzureDeployment.text()
         llm_s.azure_api_key = self.editAzureKey.text()
+        llm_s.azure_api_version = self.editAzureApiVersion.text()
         llm_s.ollama_host = self.editOHost.text()
         llm_s.ollama_model = self.cmbOllamaModel.currentText()
         settings.save()

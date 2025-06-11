@@ -14,10 +14,11 @@ class OpenAIProvider(ProviderBase):
     def __init__(self, cfg):
         super().__init__(cfg)
         self.cli = AsyncOpenAI(api_key=cfg.openai_api_key)
+        self.model = cfg.openai_model
 
     async def _run(self, messages: list):
         r = await self.cli.chat.completions.create(
-            model="gpt-4o-mini",
+            model=self.model,
             messages=messages,
             response_format={"type": "json_object"}
         )

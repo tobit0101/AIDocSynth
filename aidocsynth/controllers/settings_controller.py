@@ -132,3 +132,28 @@ class SettingsController(QObject):
         if directory:
             line_edit_widget.setText(directory)
 
+    def _update_openai_model_field(self):
+        llm_s = settings.data.llm
+        self.dlg.editOpenAIModel.setText(llm_s.openai_model)
+
+    def _save_openai_model_field(self):
+        llm_s = settings.data.llm
+        llm_s.openai_model = self.dlg.editOpenAIModel.text()
+
+    def _update_azure_api_version_field(self):
+        llm_s = settings.data.llm
+        self.dlg.editAzureApiVersion.setText(llm_s.azure_api_version)
+
+    def _save_azure_api_version_field(self):
+        llm_s = settings.data.llm
+        llm_s.azure_api_version = self.dlg.editAzureApiVersion.text()
+
+    def load_settings(self):
+        self._update_openai_model_field()
+        self._update_azure_api_version_field()
+        # ... (rest of the method remains the same)
+
+    def save_settings(self):
+        self._save_openai_model_field()
+        self._save_azure_api_version_field()
+        # ... (rest of the method remains the same)

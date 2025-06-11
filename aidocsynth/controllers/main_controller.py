@@ -11,7 +11,7 @@ from PySide6.QtWidgets import QApplication
 from aidocsynth.models.job import Job
 from aidocsynth.utils.worker import Worker
 from aidocsynth.services.settings_service import settings
-from aidocsynth.services.file_manager import backup_original, copy_sorted, copy_unsorted, get_directory_structure, sort_and_copy_document
+from aidocsynth.services.file_manager import backup_original, copy_sorted, copy_unsorted, get_directory_structure, sort_and_copy_document, get_file_metadata
 from aidocsynth.services.text_pipeline import full_text
 from aidocsynth.services.providers.base import get_provider
 from aidocsynth.services.classification_service import ClassificationService
@@ -21,9 +21,8 @@ class MainController(QObject):
     jobAdded = Signal(Job); jobUpdated = Signal(Job)
     ocr_status_changed = Signal(str) # message
 
-    def __init__(self, view, config_manager):
+    def __init__(self, config_manager):
         super().__init__()
-        self.view = view
         self.config_manager = config_manager
         self.logger = logging.getLogger(self.__class__.__name__)
         self.pool = QThreadPool.globalInstance()
@@ -126,10 +125,14 @@ class MainController(QObject):
             # Format the directory structure with file counts for the prompt
             directory_structure = [f"{path} ({count} files)" for path, count in dir_tuples]
 
-            # 4. Call the service to perform classification
+            # 4. Get file metadata
+            file_metadata = get_file_metadata(Path(job.path))
+
+            # 5. Call the service to perform classification
             classification_data = await classification_service.classify_document(
                 text_content=text_content,
                 file_path=job.path,
+                metadata=file_metadata,
                 directory_structure=directory_structure
             )
 
