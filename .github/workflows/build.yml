@@ -63,6 +63,7 @@ jobs:
                                       -DestinationPath dist/AIDocSynth-Windows.zip
 
       - name: Upload artifact
+        if: startsWith(github.ref, 'refs/tags/')
         uses: actions/upload-artifact@v4
         with:
           name: ${{ runner.os }}-asset
