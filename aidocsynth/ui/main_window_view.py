@@ -25,6 +25,9 @@ class MainWindowView(QMainWindow):
         self._create_menus()
         self._connect_signals()
 
+        # Flag to track if OCR engine initialization is finished
+        self.ocr_initialized = False
+
         self._load_settings()
 
     def _setup_ui(self):
@@ -120,18 +123,26 @@ class MainWindowView(QMainWindow):
 
     @Slot(str)
     def update_ocr_status(self, message):
-        """Updates the OCR status label and switches the drop area view."""
-        self.ocr_status_label.setText(f"OCR-Status: {message}")
-        # The final ready signal is just "Bereit"
-        is_ready = "Bereit" in message
-        
-        # NEW: Switch the view in the QStackedWidget
-        if is_ready:
-            self.drop_area_stack.setCurrentWidget(self.active_drop_area)
-        else:
-            self.drop_area_stack.setCurrentWidget(self.inactive_view)
-            
-        self.logger.info(f"OCR status: '{message}', Drop area ready: {is_ready}")
+        """Updates the OCR status label and manages drag-and-drop availability.
+
+        The drop area is disabled only while the OCR engine is being initialised.
+        After the first "Bereit" signal the area remains enabled, allowing additional
+        files to be dropped even while other jobs are still processing.
+        """
+        self.ocr_status_label.setText(message)
+
+        # After the OCR engine signals readiness once, keep the drop area active.
+        if not self.ocr_initialized:
+            if "Bereit" in message:
+                # Initialisation finished -> enable drag & drop
+                self.ocr_initialized = True
+                self.drop_area_stack.setCurrentWidget(self.active_drop_area)
+            else:
+                # Still initialising -> keep disabled
+                self.drop_area_stack.setCurrentWidget(self.inactive_view)
+        # If already initialised, never block the drop area again
+
+        self.logger.info(f"OCR status: '{message}', OCR initialised: {self.ocr_initialized}")
 
     def update_job_progress(self, job):
         """Updates the progress bar and status label for a job."""

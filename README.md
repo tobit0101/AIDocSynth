@@ -44,6 +44,26 @@ AIDocSynth liest diese Dokumente, **versteht** ihren Inhalt dank KI und *sortie
 *Keine Python‑Kenntnisse nötig.*
 Für Offline‑KI empfiehlt sich ein lokaler **Ollama‑Server** (optional) – die App funktioniert aber auch ohne.
 
+### Lokale KI mit Ollama nutzen
+
+1. **Ollama installieren**  
+   • macOS: `brew install ollama`  
+   • Windows / Linux: Installer von [ollama.com](https://ollama.com)
+
+2. **Server starten** – einfach `ollama serve` ausführen.  
+   Die Standard-Adresse `http://localhost:11434` wird von AIDocSynth automatisch erkannt.
+
+3. **Modell herunterladen** (einmalig):
+   ```bash
+   ollama pull mistral-small3.1
+   ```
+   Wir empfehlen *mistral-small 3.1* (ca. 15 GB) – schnell, sparsam und präzise.
+
+4. **In AIDocSynth auswählen**:  
+   Menü **Einstellungen → LLM-Provider** öffnen, »Ollama« wählen und als *Model Name* `mistral-small3.1` eingeben.
+
+> Beim ersten Lauf wird das Modell heruntergeladen; danach arbeitet AIDocSynth komplett offline.
+
 ---
 
 ## Entwickler‑Setup
@@ -80,9 +100,6 @@ AIDocSynth/
 
 ## Architektur‑Überblick
 
-![Architektur‑Diagramm](docs/assets/architecture_placeholder.svg)
-*<– Platzhalter: hier folgt später ein Sequence‑ oder Component‑Diagramm –>*
-
 1. **DropArea → MainController** — nimmt Pfade entgegen, legt `Job` an.
 2. **Worker Thread** führt asynchrone **Pipeline** aus: Backup → Text‑Extraktion (direkt + OCR) → LLM‑Klassifizierung → Sortierung.
 3. **Provider‑Layer** abstrahiert OpenAI, Azure OpenAI, Ollama etc.
@@ -93,6 +110,7 @@ AIDocSynth/
 ## Roadmap
 
 * [x] **MVP** mit OpenAI‑Workflow & Basis‑GUI
+* [ ] Job History mit Aktiv/Abgeschlossen Prozessen
 * [ ] Wizard für Ersteinrichtung (API‑Keys, Ordnerwahl)
 * [ ] Automatische Überwachung eines »Eingang«‑Ordners
 * [ ] Mehrsprachige UI (i18n)

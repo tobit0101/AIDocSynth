@@ -93,10 +93,14 @@ class SettingsController(QObject):
         should_load = False
         if provider == "openai":
             should_load = self.v.btnTestOpenAI.isEnabled()
-        elif provider == "azure":
-            should_load = self.v.btnTestAzure.isEnabled()
-        elif provider == "ollama":
+        elif provider == "ollama":  # Skip Azure auto-load to avoid native crash
             should_load = self.v.btnTestOllama.isEnabled()
+
+        # For Azure we currently disable automatic model loading due to
+        # stability issues that lead to segmentation faults. Users can enter
+        # the deployment name manually.
+        if provider == "azure":
+            should_load = False
 
         if should_load:
             log.info(f"Credentials for '{provider}' are present, attempting to load models...")
@@ -124,6 +128,7 @@ class SettingsController(QObject):
 
         current = combo.currentText()
         log.debug(f"Current text in combobox for '{provider}': '{current}'")
+        combo.blockSignals(True)  # Prevent editTextChanged hiding the label
         combo.clear()
         if models:
             combo.addItems(models)
@@ -136,26 +141,38 @@ class SettingsController(QObject):
                 log.debug(f"Set selection to first model in list: '{models[0]}'.")
         else:
             log.warning(f"Received an empty model list for provider '{provider}'. Combobox is empty.")
+        combo.blockSignals(False)
 
     # ---------------------------------------------------------------- #
     #   Connection-Test                                                #
     # ---------------------------------------------------------------- #
     def _test(self, provider: str):
+        """Starts a connection test for the given provider."""
         log.info(f"Starting connection test for provider: {provider}")
         cfg = self._collect_temp_cfg()
 
-        async def _run(signals):
-            success, message = await test_provider_connection(cfg)
-            signals.result.emit((success, message))
+        # Connection tests are lightweight single HTTP calls. Run them
+        # synchronously in the GUI thread for all providers to avoid thread
+        # teardown issues and keep the implementation simple.
+        try:
+            success, message = asyncio.run(test_provider_connection(cfg))
+        except Exception as exc:
+            success, message = False, str(exc)
 
-        worker = Worker(_run)
-        worker.sig.result.connect(lambda res: self.testDone.emit(provider, *res))
-        self._pool.start(worker)
+        if success and not message:
+            message = "Erfolgreich"
+
+        self.testDone.emit(provider, success, message)
+
+        # On success, immediately refresh model list for providers that support
+        # dynamic models. (Azure requires deployment name, so we skip it.)
+        if success and provider in ("openai", "ollama"):
+            self._load_models(provider)
 
     # ---------------------------------------------------------------- #
     def _handle_successful_test(self, provider: str, success: bool, message: str):
         """If a test is successful, (re)load the models for that provider."""
-        if success:
+        if success and provider in ("openai", "ollama"):
             log.info(f"Connection test for '{provider}' was successful, refreshing model list.")
             self._load_models(provider)
 
@@ -191,4 +208,3 @@ class SettingsController(QObject):
             ollama_host     = self.v.editOllamaBaseUrl.text().strip(),
             ollama_model    = self.v.cmbOllamaModel.currentText().strip() or "llama3"
         )
-

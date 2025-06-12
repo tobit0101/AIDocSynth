@@ -2,6 +2,7 @@ import json
 import logging
 from pathlib import Path
 from typing import Any, Dict, List
+import time
 
 from jinja2 import Environment, PackageLoader, select_autoescape
 
@@ -15,6 +16,8 @@ class ClassificationService:
         )
         self.system_prompt_template = self.jinja_env.get_template("system.j2")
         self.user_prompt_template = self.jinja_env.get_template("analysis.j2")
+        # Maximum number of retries if the LLM returns an invalid response
+        self.max_retries: int = 3
 
     async def classify_document(
         self, 
@@ -56,14 +59,63 @@ class ClassificationService:
         self.logger.debug(f"System Prompt:\n{system_prompt}")
         self.logger.debug(f"User Prompt for {file_name_string}:\n{user_prompt}")
 
-        try:
-            classification_data = await self.llm_provider.classify_document(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt
-            )
-            self.logger.info(f"Successfully classified {file_name_string}.")
-            return classification_data
-        except Exception as e:
-            self.logger.error(f"Error during document classification for {file_name_string}: {e}", exc_info=True)
-            # Fallback or error structure
-            return {"error": "Classification failed", "details": str(e)}
+        # Start overall timer to measure processing duration
+        overall_start = time.perf_counter()
+
+        # Retry loop – ensures we get at least a JSON object that contains
+        # the mandatory keys: "file_name" and "target_path".
+        last_error: Exception | None = None
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                raw_response = await self.llm_provider.classify_document(
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt
+                )
+
+                # The provider may already return a dict or a JSON string. Try both.
+                if isinstance(raw_response, dict):
+                    classification_data = raw_response
+                else:
+                    classification_data = json.loads(str(raw_response))
+
+                # Validate minimal schema
+                if not (
+                    isinstance(classification_data, dict)
+                    and "file_name" in classification_data
+                    and "target_path" in classification_data
+                ):
+                    raise ValueError(
+                        "Invalid classification result – missing required keys 'file_name' and/or 'target_path'."
+                    )
+
+                # Success – log and return (include timing)
+                overall_duration = time.perf_counter() - overall_start
+                self.logger.info(
+                    f"Successfully classified {file_name_string} on attempt {attempt} in {overall_duration:.2f}s."
+                )
+                return classification_data
+
+            except (json.JSONDecodeError, ValueError) as e:
+                # Response content error – potentially recoverable
+                last_error = e
+                self.logger.warning(
+                    f"Attempt {attempt} for {file_name_string} returned an invalid response: {e}"
+                )
+            except Exception as e:
+                # Other, potentially transient error (network, provider error, etc.)
+                last_error = e
+                self.logger.warning(
+                    f"Attempt {attempt} for {file_name_string} failed with error: {e}",
+                    exc_info=True,
+                )
+
+        # All retries exhausted – return fallback structure
+        overall_duration = time.perf_counter() - overall_start
+
+        error_message = (
+            f"Classification failed after {self.max_retries} attempts: {last_error}"
+            if last_error
+            else "Classification failed for unknown reasons."
+        )
+        self.logger.error(f"{error_message} (took {overall_duration:.2f}s)")
+        return {"error": "Classification failed", "details": str(last_error)}

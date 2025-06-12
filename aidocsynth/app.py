@@ -35,11 +35,11 @@ def setup_tray_icon(parent_app):
     if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
         # Running in a PyInstaller bundle
         base_path = sys._MEIPASS
-        icon_path = os.path.join(base_path, 'aidocsynth', 'ui', 'resources', 'app.png')
+        icon_path = os.path.join(base_path, 'aidocsynth', 'ui', 'resources', 'app_tray.png')
     else:
         # Running in a normal Python environment
         script_dir = os.path.dirname(os.path.realpath(__file__))
-        icon_path = os.path.join(script_dir, "ui", "resources", "app.png")
+        icon_path = os.path.join(script_dir, "ui", "resources", "app_tray.png")
     
     icon = QIcon(icon_path)
     if icon.isNull():

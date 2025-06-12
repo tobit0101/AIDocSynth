@@ -25,7 +25,7 @@ class AboutDialogView(QDialog):
 
         # App Icon
         icon_label = QLabel()
-        icon_path = os.path.join(os.path.dirname(__file__), "resources", "app.png") # Assuming app.png is the source
+        icon_path = os.path.join(os.path.dirname(__file__), "resources", "app_icon.png")
         if os.path.exists(icon_path):
             pixmap = QPixmap(icon_path)
             icon_label.setPixmap(pixmap.scaled(64, 64, Qt.KeepAspectRatio, Qt.SmoothTransformation))

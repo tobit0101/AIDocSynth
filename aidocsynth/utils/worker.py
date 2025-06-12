@@ -1,4 +1,4 @@
-from PySide6.QtCore import QObject, QRunnable, Signal, Slot
+from PySide6.QtCore import QObject, QRunnable, Signal, Slot, QCoreApplication
 import asyncio
 import inspect
 import traceback
@@ -15,6 +15,12 @@ class Worker(QRunnable):
         super().__init__()
         self.fn, self.args, self.kwargs = fn, args, kwargs
         self.sig = WorkerSignals()
+        # Ensure the signals object lives in the main (GUI) thread to prevent
+        # destruction from the worker thread which can lead to Qt semaphore
+        # leaks and segmentation faults.
+        main_thread = QCoreApplication.instance().thread() if QCoreApplication.instance() else None
+        if main_thread:
+            self.sig.moveToThread(main_thread)
 
     @Slot()
     def run(self):
@@ -41,7 +47,13 @@ class Worker(QRunnable):
                 pass  # Signal source might be deleted
         else:
             try:
-                self.sig.result.emit(result)
+                # Emit result only if the function returned a meaningful value. If the
+                # function handled its own signal emission (common when it receives a
+                # `signals` argument), it will usually return `None`, so we avoid
+                # emitting `None` again to prevent duplicate emissions that can break
+                # downstream unpacking logic.
+                if result is not None:
+                    self.sig.result.emit(result)
             except RuntimeError:
                 pass  # Signal source might be deleted
         finally:

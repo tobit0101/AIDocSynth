@@ -47,7 +47,8 @@ class MainController(QObject):
 
         self.active_jobs += len(paths)
         self.logger.info(f"Received drop: {paths}, active jobs now: {self.active_jobs}")
-        self.ocr_status_changed.emit(f"Verarbeite {len(paths)} Datei(en)...")
+        # Inform UI about total number of active jobs
+        self._emit_processing_status()
         for p in paths:
             job = Job(path=p)
             self.jobAdded.emit(job)
@@ -91,6 +92,9 @@ class MainController(QObject):
         self.logger.info(f"Job beendet, {self.active_jobs} aktive Jobs übrig")
         if self.active_jobs == 0:
             self.ocr_status_changed.emit("Bereit")
+        else:
+            # Update the UI with remaining job count
+            self._emit_processing_status()
 
     async def _update_job_progress(self, job, progress, status_message, log_message_prefix=""):
         job.progress = progress
@@ -199,3 +203,14 @@ class MainController(QObject):
         
         dialog = AboutDialogView(parent=parent_window)
         dialog.exec()
+
+    # ------------------------------------------------------------------
+    # Helper Methods
+    # ------------------------------------------------------------------
+    def _emit_processing_status(self):
+        """Emit a human-readable processing status based on active_jobs."""
+        if self.active_jobs == 1:
+            msg = "Verarbeite 1 Datei..."
+        else:
+            msg = f"Verarbeite {self.active_jobs} Dateien..."
+        self.ocr_status_changed.emit(msg)

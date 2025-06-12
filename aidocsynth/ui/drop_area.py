@@ -1,8 +1,9 @@
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QDragEnterEvent, QDropEvent, QDragLeaveEvent
 from PySide6.QtWidgets import (
-    QFrame, QLabel, QVBoxLayout, QWidget, QSizePolicy, QHBoxLayout
+    QFrame, QLabel, QVBoxLayout, QWidget, QSizePolicy, QHBoxLayout, QFileDialog
 )
+import pathlib
 
 
 class InactiveView(QFrame):
@@ -45,6 +46,18 @@ class ActiveDropArea(QFrame):
         self.setAcceptDrops(True)
         self.setObjectName("activeDropArea")
         self.setAttribute(Qt.WA_StyledBackground, True)
+        # Show pointing-hand cursor to indicate clickability
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        # Supported file extensions (lowercase, without the leading dot)
+        self._allowed_extensions = {
+            # Office
+            "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+            # PDF
+            "pdf",
+            # Images
+            "png", "jpg", "jpeg", "bmp", "tiff", "tif", "gif", "webp"
+        }
 
         # Main layout to center the content container
         main_layout = QVBoxLayout(self)
@@ -100,6 +113,53 @@ class ActiveDropArea(QFrame):
         # Set initial property for styling
         self.setProperty("highlighted", "false")
 
+    # ----------------- Internal helpers -----------------
+    def _is_supported(self, path: str) -> bool:
+        """Return True if the file has an allowed extension."""
+        ext = pathlib.Path(path).suffix.lower().lstrip(".")
+        return ext in self._allowed_extensions
+
+    def _filter_supported(self, paths: list[str]) -> list[str]:
+        """Filter and return only supported file paths."""
+        return [p for p in paths if self._is_supported(p)]
+
+    # ----------------- Qt Events -----------------
+    def mousePressEvent(self, event):
+        """Open a file dialog on click and emit filesDropped with the selection."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            # Build file dialog filter string, e.g. "Office/Images/PDF (*.pdf *.png)"
+            wildcard = " ".join(f"*.{ext}" for ext in sorted(self._allowed_extensions))
+            caption = self.tr("Dateien auswählen")
+            paths, _ = QFileDialog.getOpenFileNames(
+                self,
+                caption,
+                "",
+                f"Unterstützte Dateien ({wildcard})"
+            )
+            if paths:
+                supported = self._filter_supported(paths)
+                if supported:
+                    self.filesDropped.emit(supported)
+        super().mousePressEvent(event)
+
+    def dragEnterEvent(self, event: QDragEnterEvent):
+        if event.mimeData().hasUrls():
+            urls = [url.toLocalFile() for url in event.mimeData().urls()]
+            if any(self._is_supported(u) for u in urls):
+                event.acceptProposedAction()
+                self._set_highlighted(True)
+                return
+        event.ignore()
+        super().dragEnterEvent(event)
+
+    def dropEvent(self, event: QDropEvent):
+        self._set_highlighted(False)
+        urls = [url.toLocalFile() for url in event.mimeData().urls()]
+        supported = self._filter_supported(urls)
+        if supported:
+            self.filesDropped.emit(supported)
+        super().dropEvent(event)
+
     def _setup_stylesheet(self):
         self.setStyleSheet("""
             #activeDropArea {
@@ -148,19 +208,6 @@ class ActiveDropArea(QFrame):
         self.setProperty("highlighted", "true" if highlighted else "false")
         self._refresh_qss()
 
-    def dragEnterEvent(self, event: QDragEnterEvent):
-        if event.mimeData().hasUrls():
-            event.acceptProposedAction()
-            self._set_highlighted(True)
-        super().dragEnterEvent(event)
-
     def dragLeaveEvent(self, event: QDragLeaveEvent):
         self._set_highlighted(False)
         super().dragLeaveEvent(event)
-
-    def dropEvent(self, event: QDropEvent):
-        self._set_highlighted(False)
-        urls = [url.toLocalFile() for url in event.mimeData().urls()]
-        if urls:
-            self.filesDropped.emit(urls)
-        super().dropEvent(event)

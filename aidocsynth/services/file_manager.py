@@ -75,6 +75,28 @@ class FileManager:
         logger.error(f"Could not move file {dst_name} to {dst_dir}. All versions up to 999 exist.")
         raise FileExistsError(f"Could not move file {dst_name} to {dst_dir}. All versions up to 999 exist.")
 
+    def _ensure_within_work_dir(self, path: Path) -> Path:
+        """Resolve *path* and make sure it is located within the configured
+        ``work_dir``.  This prevents accidental writes outside of the
+        workspace.  Returns the resolved path on success, otherwise raises
+        ``ValueError``.
+
+        Parameters
+        ----------
+        path: Path
+            Destination directory that should be created/used.
+        """
+        work_dir_resolved = self.cfg.work_dir.resolve()
+        path_resolved = path.resolve()
+
+        # ``work_dir`` must be a parent (or equal) of the destination.
+        if work_dir_resolved == path_resolved or work_dir_resolved in path_resolved.parents:
+            return path_resolved
+
+        raise ValueError(
+            f"Destination '{path_resolved}' is outside the workspace '{work_dir_resolved}'."
+        )
+
     def backup_original(self, src: Path) -> Optional[Path]:
         """Creates a versioned copy of the original file in the backup directory if enabled."""
         if not self.cfg.create_backup:
@@ -131,13 +153,26 @@ class FileManager:
         return directory_structure
 
     def process_document(self, src_path: Path, classification_data: dict) -> Optional[Path]:
-        """Sorts a document by copying or moving it to the target directory based on settings."""
+        """Sorts a document by copying or moving it to the target directory based on settings.
+
+        The *classification_data* must contain a ``target_path`` key that either
+        holds a **relative** path inside the workspace or an **absolute** path
+        that still points into the workspace. Any attempt to escape the
+        workspace raises an exception and the document will be placed in the
+        *unsorted* directory.
+        """
         src_name = src_path.name
         try:
             target_path_str = classification_data['target_path']
             file_name = classification_data['file_name']
-            
-            dst_dir = self.cfg.work_dir / target_path_str
+
+            raw_target = Path(target_path_str)
+            # Relative paths are interpreted relative to the workspace, absolute
+            # paths are validated to still be inside the workspace.
+            if raw_target.is_absolute():
+                dst_dir = self._ensure_within_work_dir(raw_target)
+            else:
+                dst_dir = self._ensure_within_work_dir(self.cfg.work_dir / raw_target)
             
             action_verb = "Moving" if self.cfg.sort_action == "move" else "Copying"
             logger.info(f"[{src_name}] {action_verb} file to '{target_path_str}' as '{file_name}'...")
