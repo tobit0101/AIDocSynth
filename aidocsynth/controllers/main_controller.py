@@ -15,7 +15,9 @@ from aidocsynth.services.file_manager import FileManager
 from aidocsynth.services.text_pipeline import full_text
 from aidocsynth.services.providers.base import get_provider
 from aidocsynth.services.classification_service import ClassificationService
+from aidocsynth.services.metadata_service import MetadataService, write_metadata_task
 from aidocsynth.ui.about_dialog_view import AboutDialogView
+
 
 class MainController(QObject):
     jobAdded = Signal(Job); jobUpdated = Signal(Job)
@@ -113,51 +115,54 @@ class MainController(QObject):
         await self._update_job_progress(job, 50, "ocr complete")
         return text
 
-    async def _classify_document(self, job, text_content):
-        await self._update_job_progress(job, 70, "classifying", "3/5")
+    async def _classify_document(self, job, text_content, src_path):
+        await self._update_job_progress(job, 70, "classifying", "3/6")
         llm_provider = None
         try:
-            # 1. Get a new provider instance for this job.
             llm_provider = get_provider(self.config_manager.data.llm)
-
-            # 2. Instantiate classification service
             classification_service = ClassificationService(llm_provider)
-
             loop = asyncio.get_running_loop()
+            metadata_service = MetadataService()
 
-            # 3. Get directory structure and metadata in the background.
-            # This runs I/O operations in the executor pool to avoid blocking.
-            directory_structure, file_metadata = await asyncio.gather(
+            directory_structure, original_metadata = await asyncio.gather(
                 loop.run_in_executor(self.process_pool, self.file_manager.get_formatted_directory_structure),
-                loop.run_in_executor(self.process_pool, self.file_manager.get_file_metadata, Path(job.path))
+                loop.run_in_executor(self.process_pool, metadata_service.get_file_metadata, src_path)
             )
 
-            # 5. Call the service to perform classification
             classification_data = await classification_service.classify_document(
                 text_content=text_content,
                 file_path=job.path,
-                metadata=file_metadata,
+                metadata=original_metadata,
                 directory_structure=directory_structure
             )
 
             src_name = Path(job.path).name
             self.logger.info(f"[{src_name}] -> Classification result: {classification_data}")
-            return classification_data
+            return classification_data, original_metadata
         finally:
-            # 5. Ensure the provider's resources are closed for this job.
             if llm_provider:
                 await llm_provider.close()
 
     async def _process_file(self, job, src_path, classification_data):
-        await self._update_job_progress(job, 90, "processing", "4/5")
-        
-        # Delegate final processing to the file manager service
+        await self._update_job_progress(job, 90, "processing", "4/6")
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
+        new_path = await loop.run_in_executor(
             self.process_pool,
             self.file_manager.process_document, 
             src_path, 
             classification_data
+        )
+        return new_path
+
+    async def _generate_and_write_metadata(self, job, new_path, classification_data, original_metadata):
+        await self._update_job_progress(job, 95, "writing metadata", "5/6")
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            self.process_pool,
+            write_metadata_task,
+            new_path,
+            classification_data,
+            original_metadata
         )
 
     async def _pipeline(self, job):
@@ -167,10 +172,14 @@ class MainController(QObject):
         try:
             await self._backup_file(job, src_path)
             text_content = await self._extract_text_ocr(job, src_path)
-            classification_data = await self._classify_document(job, text_content)
-            await self._process_file(job, src_path, classification_data)
+            classification_data, original_metadata = await self._classify_document(job, text_content, src_path)
+            
+            new_path = await self._process_file(job, src_path, classification_data)
 
-            await self._update_job_progress(job, 100, "completed", "5/5")
+            if new_path:
+                await self._generate_and_write_metadata(job, new_path, classification_data, original_metadata)
+
+            await self._update_job_progress(job, 100, "completed", "6/6")
             return job
 
         except Exception as e:
