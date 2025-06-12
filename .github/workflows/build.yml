@@ -9,6 +9,7 @@ on:
 jobs:
   # ---------- Build ----------
   build:
+    if: startsWith(github.ref, 'refs/tags/')
     strategy:
       matrix:
         os: [macos-14, windows-latest]
@@ -63,7 +64,6 @@ jobs:
                                       -DestinationPath dist/AIDocSynth-Windows.zip
 
       - name: Upload artifact
-        if: startsWith(github.ref, 'refs/tags/')
         uses: actions/upload-artifact@v4
         with:
           name: ${{ runner.os }}-asset
