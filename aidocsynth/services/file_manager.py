@@ -166,6 +166,18 @@ class FileManager:
             target_path_str = classification_data['target_path']
             file_name = classification_data['file_name']
 
+            # Ensure the target file name contains exactly the same extension as the
+            # source (case-insensitive). If absent or different, enforce the
+            # original suffix in lowercase to keep consistency.
+            src_suffix_lower = src_path.suffix.lower()
+            dst_suffix_lower = Path(file_name).suffix.lower()
+            if dst_suffix_lower == "" or dst_suffix_lower != src_suffix_lower:
+                # Strip any wrong extension and append correct one
+                file_name = f"{Path(file_name).stem}{src_suffix_lower}"
+                logger.debug(
+                    f"[{src_name}] Harmonised file extension. Using '{src_suffix_lower}' -> '{file_name}'."
+                )
+
             raw_target = Path(target_path_str)
             # Relative paths are interpreted relative to the workspace, absolute
             # paths are validated to still be inside the workspace.
