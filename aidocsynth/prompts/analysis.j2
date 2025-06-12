@@ -18,13 +18,16 @@ Bestehende Verzeichnisstruktur (relative Pfade vom Arbeitsverzeichnis):
 Extrahiere folgende Informationen:
 
 1. **headline**: Ein einzelnes, kurzes, prägnantes Substantiv (max. 15-20 Zeichen)
-2. **context**: Ein präziser Satz, der den Hauptinhalt des Dokuments beschreibt
-3. **yyyymmdd**: Dokumentdatum im Format YYYYMMDD (8 Ziffern ohne Trennzeichen)
-4. **label**: Spezifisches kurzes Identifikationsmerkmal (max. 20 Zeichen)
+2. **label**: Spezifisches kurzes Identifikationsmerkmal (max. 20 Zeichen)
+3. **context**: Ein präziser Satz, der den Hauptinhalt des Dokuments beschreibt
+4. **yyyymmdd**: Dokumentdatum im Format YYYYMMDD (8 Ziffern ohne Trennzeichen)
 5. **document_type**: Kategorie des Dokuments aus der vordefinierten Liste
 6. **main_party**: Hauptpartei im Dokument
-7. **keywords**: 3-5 relevante Schlüsselwörter zum Dokument
-8. **target_path**: Der optimale relative Zielpfad für das Dokument nach dem semantischen Ebenenmodell
+7. **author**: Autor des Dokuments, falls bekannt.
+8. **description**: Eine detailliertere Beschreibung des Inhalts, falls relevant.
+9. **comment**: Zusätzliche Kommentare oder Notizen.
+10. **keywords**: 3-5 relevante Schlüsselwörter zum Dokument
+11. **target_path**: Der optimale relative Zielpfad für das Dokument nach dem semantischen Ebenenmodell
 
 Für den Zielpfad:
 - Verwende einen EXISTIERENDEN Pfad, wenn er semantisch passend ist
@@ -35,7 +38,7 @@ Für den Zielpfad:
 
 ### Formatierungsregeln für alle Felder:
 - Keine Umlaute (ä→ae, ö→oe, ü→ue, ß→ss)
-- Keine Leerzeichen oder Sonderzeichen (außer Unterstriche)
+- Keine Leerzeichen oder Sonderzeichen im Pfad und Dateinamen (außer Unterstriche)
 - Bevorzuge SnakeCase für Dateinamen und PascalCase für Verzeichnispfade
 
 
@@ -58,7 +61,7 @@ Gib das Ergebnis als JSON-Objekt zurück:
   "document_type": "...",
   "main_party": "...",
   "author": "...",
-  "subject": "...",
+  "description": "...",
   "comment": "...",
   "keywords": ["...", "...", "..."],
   "target_path": "Semantisch/Sinnvoller/Pfad",

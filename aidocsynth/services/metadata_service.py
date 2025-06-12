@@ -64,7 +64,8 @@ class MetadataService:
             'context': 'subject',
             'author': 'author',
             'comment': 'comment',
-            'keywords': 'keywords'
+            'keywords': 'keywords',
+            'description': 'description'
         }
 
         for llm_key, meta_key in llm_mapping.items():
@@ -188,7 +189,11 @@ class MetadataService:
             img_info = img.info.copy()
             modified = False
             if file_path.suffix.lower() in (".jpg", ".jpeg", ".heic", ".tiff", ".tif"):
-                exif_dict = piexif.load(img_info.get("exif", b''))
+                raw_exif = img_info.get("exif")
+                if raw_exif:
+                    exif_dict = piexif.load(raw_exif)
+                else:
+                    exif_dict = {"0th": {}, "Exif": {}, "GPS": {}, "1st": {}, "thumbnail": None}
                 if COMMON_METADATA_KEYS["author"] in metadata:
                     exif_dict["0th"][piexif.ImageIFD.Artist] = metadata[COMMON_METADATA_KEYS["author"]].encode()
                     modified = True
