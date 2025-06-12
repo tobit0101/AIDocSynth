@@ -33,7 +33,7 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     # --- Excludes ---
-    excludes=['pytest', 'tensorboard', 'numpy.tests', 'torch.testing', 'torch.backends.mkldnn'],
+    excludes=['pytest', 'tensorboard', 'numpy.tests', 'torch.backends.mkldnn'],
     noarchive=dev,
 )
 

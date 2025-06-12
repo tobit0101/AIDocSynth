@@ -62,6 +62,13 @@ Für Offline‑KI empfiehlt sich ein lokaler **Ollama‑Server** (optional) –
 4. **In AIDocSynth auswählen**:  
    Menü **Einstellungen → LLM-Provider** öffnen, »Ollama« wählen und als *Model Name* `mistral-small3.1` eingeben.
 
+5. **macOS & Windows Sicherheitshinweis**  
+   Bei der ersten Ausführung blockieren Gatekeeper (macOS) bzw. SmartScreen (Windows) eventuell die Anwendung.
+   * **macOS:** Rechtsklick → *Öffnen* oder in **Systemeinstellungen → Datenschutz & Sicherheit** die App »Dennoch öffnen«.  
+     Apple-Anleitung: <https://support.apple.com/de-de/guide/mac-help/mh40616/mac>  
+   * **Windows:** Warnung ignorieren und *Trotzdem ausführen* wählen.  
+     Schritt-für-Schritt: <https://www.pctipp.ch/praxis/windows/windows-programm-trotzdem-ausfuehren-2006472.html>
+
 > Beim ersten Lauf wird das Modell heruntergeladen; danach arbeitet AIDocSynth komplett offline.
 
 ---
