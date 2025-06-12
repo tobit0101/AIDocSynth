@@ -1,5 +1,3 @@
-## User Prompt
-
 Analysiere die folgenden Informationen zur Datei '{{ file_name_string }}' und extrahiere strukturierte Daten sowie den optimalen Zielpfad.
 
 Metadata:
@@ -19,19 +17,37 @@ Bestehende Verzeichnisstruktur (relative Pfade vom Arbeitsverzeichnis):
 
 Extrahiere folgende Informationen:
 
-1. **headline**: Ein einzelnes, prägnantes Substantiv (max. 15-20 Zeichen, kleinbuchstaben)
+1. **headline**: Ein einzelnes, kurzes, prägnantes Substantiv (max. 15-20 Zeichen)
 2. **context**: Ein präziser Satz, der den Hauptinhalt des Dokuments beschreibt
 3. **yyyymmdd**: Dokumentdatum im Format YYYYMMDD (8 Ziffern ohne Trennzeichen)
-4. **label**: Spezifisches Identifikationsmerkmal (max. 20 Zeichen, kleinbuchstaben)
+4. **label**: Spezifisches kurzes Identifikationsmerkmal (max. 20 Zeichen)
 5. **document_type**: Kategorie des Dokuments aus der vordefinierten Liste
-6. **main_party**: Hauptpartei im Dokument (kleinbuchstaben)
-7. **keywords**: 3-5 relevante Schlüsselwörter zum Dokument (kleinbuchstaben)
+6. **main_party**: Hauptpartei im Dokument
+7. **keywords**: 3-5 relevante Schlüsselwörter zum Dokument
 8. **target_path**: Der optimale relative Zielpfad für das Dokument nach dem semantischen Ebenenmodell
 
 Für den Zielpfad:
 - Verwende einen EXISTIERENDEN Pfad, wenn er semantisch passend ist
-- Erstelle einen NEUEN Pfad nur wenn nötig (max. 5 Ebenen tief)
-- Bevorzuge bestehende Strukturen und erweitere sie logisch
+- Erstelle einen NEUEN Pfad nur wenn nötig
+- Die Verzeichnistiefe sollte sich nach dem semantischen Bedarf richten, nicht nach einer festen Anzahl
+- Bevorzuge bestehende Verzeichnisse und erweitere nur, wenn semantisch sinnvoll
+- Vermeide unnötige Hierarchieebenen - Jede Ebene muss einen klaren semantischen Mehrwert bieten
+
+### Formatierungsregeln für alle Felder:
+- Keine Umlaute (ä→ae, ö→oe, ü→ue, ß→ss)
+- Keine Leerzeichen oder Sonderzeichen (außer Unterstriche)
+- Bevorzuge SnakeCase für Dateinamen und PascalCase für Verzeichnispfade
+
+
+### Verzeichnisstruktur-Prinzipien:
+Jede Ebene im Verzeichnispfad sollte eine eigene semantische Dimension darstellen und nur hinzugefügt werden, wenn sie notwendig ist:
+- **Domain / Arbeitsbereich** (oberste Hierarchieebene)
+- **Themenbereich oder Fachgebiet** (wenn zur Unterscheidung notwendig)
+- **Typ oder Funktion** (wenn zur Kategorisierung sinnvoll)
+- **Quelle, Methode oder Mitwirkender** (wenn zur Differenzierung erforderlich)
+- **Detailebene** (nur wenn eine weitere Unterteilung semantisch wertvoll ist)
+
+Wichtig: Nicht alle Ebenen müssen verwendet werden. Die Struktur sollte sich an der semantischen Notwendigkeit orientieren und so flach wie möglich, aber so tief wie nötig sein.
 
 Gib das Ergebnis als JSON-Objekt zurück:
 {
@@ -42,6 +58,6 @@ Gib das Ergebnis als JSON-Objekt zurück:
   "document_type": "...",
   "main_party": "...",
   "keywords": ["...", "...", "..."],
-  "targetPath": "Domain/Themenbereich/Typ/Quelle/Detail",
-  "fileName": "headline_yyyymmdd_label.ext"
+  "target_path": "Semantisch/Sinnvoller/Pfad",
+  "file_name": "headline_yyyymmdd_label.ext"
 }

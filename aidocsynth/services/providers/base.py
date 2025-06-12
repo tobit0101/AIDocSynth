@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import List, Tuple
 from jinja2 import Environment, PackageLoader, FileSystemLoader, select_autoescape
 import sys
 import os
@@ -7,6 +8,8 @@ import re
 import logging
 from pathlib import Path
 from aidocsynth.models.settings import LLMSettings
+
+logger = logging.getLogger(__name__)
 
 _REGISTRY: dict[str, type["ProviderBase"]] = {}
 
@@ -17,10 +20,18 @@ def register(cls):
 
 def get_provider(cfg: LLMSettings) -> "ProviderBase":
     provider_name = cfg.provider
+    logger.debug(f"get_provider called for: {provider_name}")
     if provider_name not in _REGISTRY:
+        logger.error(f"Provider '{provider_name}' not found in _REGISTRY. Available: {list(_REGISTRY.keys())}")
         raise ValueError(f"Unknown provider: {provider_name}")
+    
+    provider_class = _REGISTRY[provider_name]
+    logger.debug(f"Found provider class for '{provider_name}': {provider_class}")
+    
     # Always return a new instance.
-    return _REGISTRY[provider_name](cfg)
+    instance = provider_class(cfg)
+    logger.debug(f"Created instance for '{provider_name}': {type(instance)}")
+    return instance
 
 
 
@@ -29,6 +40,20 @@ class ProviderBase(ABC):
 
     async def close(self):
         """Close any open connections or resources. To be overridden by subclasses."""
+        pass
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        await self.close()
+
+    @abstractmethod
+    async def get_models(self, **kwargs) -> List[str]:
+        """
+        Fetches the list of available models from the provider.
+        Raises an exception if the connection or authentication fails.
+        """
         pass
 
     def __init__(self, cfg: LLMSettings):
@@ -59,7 +84,6 @@ class ProviderBase(ABC):
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ]
-        self.logger.info(f"Sending payload to LLM: {messages}")
         response_text = await self._run(messages)
         # Clean the response: remove markdown code fences and strip whitespace
         match = re.search(r"```(json)?(.*)```", response_text, re.DOTALL)

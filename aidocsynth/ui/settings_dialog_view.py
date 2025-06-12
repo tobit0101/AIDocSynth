@@ -1,199 +1,294 @@
 from pathlib import Path
 from PySide6.QtWidgets import (
+    QApplication,
     QDialog, QVBoxLayout, QLineEdit, QComboBox, 
     QDialogButtonBox, QGroupBox, QWidget, QStackedWidget, QLabel,
-    QPushButton, QHBoxLayout
+    QPushButton, QHBoxLayout, QCheckBox, QFormLayout
 )
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont
+from PySide6.QtCore import Qt
 from aidocsynth.services.settings_service import settings
+from aidocsynth.controllers.settings_controller import SettingsController
 
 class SettingsDialogView(QDialog):
     """
     Settings dialog view.
     The UI is created programmatically and linked to the settings manager.
     All settings are on a single page, organized by groups.
-    Labels are above input fields, and fields use full width.
+    Form layout is used for better alignment and visual hierarchy.
     """
     def __init__(self, parent=None):
         super().__init__(parent)
         self._setup_ui()
-        self.load_settings()
+        self.controller = SettingsController(self)
+        # self.controller.load() # Load is now called from controller's __init__
 
     def _setup_ui(self):
         self.setWindowTitle("Einstellungen")
-        self.resize(450, 600) # Adjusted size for more fields and new layout
+        self.resize(480, 620)  # Slightly wider for better readability
+        
+        # Set up main layout with proper margins
         self.layout = QVBoxLayout(self)
+        self.layout.setContentsMargins(15, 15, 15, 15)
+        self.layout.setSpacing(12)  # Increased spacing between group boxes
 
         # --- Allgemein Group ---
-        allgemein_group_box = QGroupBox("Allgemein")
-        allgemein_group_box.setStyleSheet("QGroupBox { font-weight: bold; font-size: 11pt; }")
-        allgemein_layout = QVBoxLayout(allgemein_group_box)
-        allgemein_layout.setContentsMargins(10, 20, 10, 10) # Add space below title
-        allgemein_layout.setSpacing(4) # Reduce space between label and input
+        allgemein_group_box = self._create_group_box("Allgemein")
+        allgemein_layout = QFormLayout()
+        allgemein_layout.setLabelAlignment(Qt.AlignLeft)
+        allgemein_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        allgemein_layout.setSpacing(8)  # Spacing between form rows
 
         # Work Directory
-        allgemein_layout.addWidget(QLabel("Arbeitsverzeichnis:"))
-        work_dir_layout = QHBoxLayout()
         self.editWorkDir = QLineEdit()
         self.editWorkDir.setObjectName("editWorkDir")
         self.btnWorkDir = QPushButton("...")
         self.btnWorkDir.setFixedWidth(40)
+        work_dir_layout = QHBoxLayout()
+        work_dir_layout.setSpacing(6)
         work_dir_layout.addWidget(self.editWorkDir)
         work_dir_layout.addWidget(self.btnWorkDir)
-        allgemein_layout.addLayout(work_dir_layout)
+        allgemein_layout.addRow("Arbeitsverzeichnis:", work_dir_layout)
 
         # Backup Directory
-        allgemein_layout.addWidget(QLabel("Backup-Verzeichnis:"))
-        backup_dir_layout = QHBoxLayout()
         self.editBackupRoot = QLineEdit()
         self.editBackupRoot.setObjectName("editBackupRoot")
         self.btnBackupRoot = QPushButton("...")
         self.btnBackupRoot.setFixedWidth(40)
+        backup_dir_layout = QHBoxLayout()
+        backup_dir_layout.setSpacing(6)
         backup_dir_layout.addWidget(self.editBackupRoot)
         backup_dir_layout.addWidget(self.btnBackupRoot)
-        allgemein_layout.addLayout(backup_dir_layout)
+        allgemein_layout.addRow("Backup-Verzeichnis:", backup_dir_layout)
 
         # Unsorted Directory
-        allgemein_layout.addWidget(QLabel("Unsortiert-Verzeichnis:"))
-        unsort_dir_layout = QHBoxLayout()
         self.editUnsortedRoot = QLineEdit()
         self.editUnsortedRoot.setObjectName("editUnsortedRoot")
         self.btnUnsortedRoot = QPushButton("...")
         self.btnUnsortedRoot.setFixedWidth(40)
+        unsort_dir_layout = QHBoxLayout()
+        unsort_dir_layout.setSpacing(6)
         unsort_dir_layout.addWidget(self.editUnsortedRoot)
         unsort_dir_layout.addWidget(self.btnUnsortedRoot)
-        allgemein_layout.addLayout(unsort_dir_layout)
+        allgemein_layout.addRow("Unsortiert-Verzeichnis:", unsort_dir_layout)
+
+        # Create Backup Toggle
+        self.chkCreateBackup = QCheckBox()
+        self.chkCreateBackup.setObjectName("chkCreateBackup")
+        allgemein_layout.addRow("Backup erstellen:", self.chkCreateBackup)
+
+        # Sort Action Dropdown
+        self.cmbBackupAction = QComboBox()
+        self.cmbBackupAction.setObjectName("cmbBackupAction")
+        self.cmbBackupAction.addItems(["Kopieren", "Verschieben"])
+        allgemein_layout.addRow("Aktion für Originaldatei:", self.cmbBackupAction)
+
+        allgemein_group_box.setLayout(allgemein_layout)
         self.layout.addWidget(allgemein_group_box)
 
         # --- LLM Provider Group ---
-        llm_group_box = QGroupBox("KI-Provider")
-        llm_group_box.setStyleSheet("QGroupBox { font-weight: bold; font-size: 11pt; }")
-        llm_group_layout = QVBoxLayout(llm_group_box)
-        llm_group_layout.setContentsMargins(10, 20, 10, 10) # Add space below title
-        llm_group_layout.setSpacing(4) # Reduce space between label and input
-
-        # Provider selection
-        llm_group_layout.addWidget(QLabel("Provider:"))
+        llm_group_box = self._create_group_box("KI-Provider")
+        llm_group_layout = QVBoxLayout()
+        llm_group_layout.setSpacing(10)
+        
+        # Provider selection with form layout for better alignment
+        provider_form = QFormLayout()
+        provider_form.setLabelAlignment(Qt.AlignLeft)
+        provider_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        provider_form.setSpacing(8)
+        
         self.cmbProvider = QComboBox()
         self.cmbProvider.setObjectName("cmbProvider")
         self.cmbProvider.addItems(["openai", "azure", "ollama"])
-        llm_group_layout.addWidget(self.cmbProvider)
-
+        self.cmbProvider.currentIndexChanged.connect(self._on_provider_changed)
+        provider_form.addRow("Provider:", self.cmbProvider)
+        llm_group_layout.addLayout(provider_form)
+        
+        # Add some spacing between provider selection and provider-specific settings
+        llm_group_layout.addSpacing(5)
+        
         # Provider-specific forms in a StackedWidget
         self.stwProviderForms = QStackedWidget()
         self.stwProviderForms.setObjectName("stwProviderForms")
 
         # Page 0: OpenAI
         page_openai = QWidget()
-        layout_openai = QVBoxLayout(page_openai) # Changed to QVBoxLayout
-        layout_openai.setContentsMargins(0, 0, 0, 0)
-        layout_openai.addWidget(QLabel("API Key:"))
+        layout_openai = QFormLayout(page_openai)
+        layout_openai.setLabelAlignment(Qt.AlignLeft)
+        layout_openai.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        layout_openai.setSpacing(8)
+        
         self.editOpenAIKey = QLineEdit()
-        self.editOpenAIKey.setObjectName("editOpenAIKey")
-        layout_openai.addWidget(self.editOpenAIKey)
-        layout_openai.addWidget(QLabel("Model:"))
-        self.editOpenAIModel = QLineEdit()
-        self.editOpenAIModel.setObjectName("editOpenAIModel")
-        layout_openai.addWidget(self.editOpenAIModel)
+        self.editOpenAIKey.setEchoMode(QLineEdit.Password)
+        layout_openai.addRow("API Key:", self.editOpenAIKey)
+        
+        self.cmbOpenAIModel = QComboBox()
+        self.cmbOpenAIModel.setObjectName("cmbOpenAIModel")
+        self.cmbOpenAIModel.setEditable(True)
+        layout_openai.addRow("Model:", self.cmbOpenAIModel)
+
+        self.btnTestOpenAI = QPushButton("Verbindung testen")
+        layout_openai.addRow(self.btnTestOpenAI)
+        self.lblTestResultOpenAI = QLabel()
+        layout_openai.addRow(self.lblTestResultOpenAI)
+        self.lblTestResultOpenAI.hide()
+        
         self.stwProviderForms.addWidget(page_openai)
 
         # Page 1: Azure
         page_azure = QWidget()
-        layout_azure = QVBoxLayout(page_azure) # Changed to QVBoxLayout
-        layout_azure.setContentsMargins(0, 0, 0, 0)
-        layout_azure.addWidget(QLabel("Endpoint:"))
+        layout_azure = QFormLayout(page_azure)
+        layout_azure.setLabelAlignment(Qt.AlignLeft)
+        layout_azure.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        layout_azure.setSpacing(8)
+        
         self.editAzureEndpoint = QLineEdit()
         self.editAzureEndpoint.setObjectName("editEndpoint")
-        layout_azure.addWidget(self.editAzureEndpoint)
-        layout_azure.addWidget(QLabel("Deployment:"))
-        self.editAzureDeployment = QLineEdit()
-        self.editAzureDeployment.setObjectName("editDeployment")
-        layout_azure.addWidget(self.editAzureDeployment)
-        layout_azure.addWidget(QLabel("API Key:"))
+        layout_azure.addRow("Endpoint:", self.editAzureEndpoint)
+        
+        self.editAzureDeploymentName = QLineEdit()
+        self.editAzureDeploymentName.setObjectName("editAzureDeploymentName")
+        layout_azure.addRow("Deployment Name:", self.editAzureDeploymentName)
+        
         self.editAzureKey = QLineEdit()
-        self.editAzureKey.setObjectName("editAzureKey")
         self.editAzureKey.setEchoMode(QLineEdit.Password)
-        layout_azure.addWidget(self.editAzureKey)
-        layout_azure.addWidget(QLabel("API Version:"))
+        layout_azure.addRow("API Key:", self.editAzureKey)
+        
         self.editAzureApiVersion = QLineEdit()
         self.editAzureApiVersion.setObjectName("editAzureApiVersion")
-        layout_azure.addWidget(self.editAzureApiVersion)
+        layout_azure.addRow("API Version:", self.editAzureApiVersion)
+
+        self.btnTestAzure = QPushButton("Verbindung testen")
+        layout_azure.addRow(self.btnTestAzure)
+        self.lblTestResultAzure = QLabel()
+        layout_azure.addRow(self.lblTestResultAzure)
+        self.lblTestResultAzure.hide()
+
         self.stwProviderForms.addWidget(page_azure)
 
         # Page 2: Ollama
         page_ollama = QWidget()
-        layout_ollama = QVBoxLayout(page_ollama) # Changed to QVBoxLayout
-        layout_ollama.setContentsMargins(0, 0, 0, 0)
-        layout_ollama.addWidget(QLabel("Host:"))
-        self.editOHost = QLineEdit()
-        self.editOHost.setObjectName("editOHost")
-        layout_ollama.addWidget(self.editOHost)
-        layout_ollama.addWidget(QLabel("Model:"))
+        layout_ollama = QFormLayout(page_ollama)
+        layout_ollama.setLabelAlignment(Qt.AlignLeft)
+        layout_ollama.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        layout_ollama.setSpacing(8)
+        
+        self.editOllamaBaseUrl = QLineEdit()
+        layout_ollama.addRow("Base URL:", self.editOllamaBaseUrl)
+        
         self.cmbOllamaModel = QComboBox()
         self.cmbOllamaModel.setObjectName("cmbOllamaModel")
         self.cmbOllamaModel.setEditable(True)
-        layout_ollama.addWidget(self.cmbOllamaModel)
+        layout_ollama.addRow("Model:", self.cmbOllamaModel)
+
+        self.btnTestOllama = QPushButton("Verbindung testen")
+        layout_ollama.addRow(self.btnTestOllama)
+        self.lblTestResultOllama = QLabel()
+        layout_ollama.addRow(self.lblTestResultOllama)
+        self.lblTestResultOllama.hide()
+
         self.stwProviderForms.addWidget(page_ollama)
 
         llm_group_layout.addWidget(self.stwProviderForms)
+        llm_group_box.setLayout(llm_group_layout)
         self.layout.addWidget(llm_group_box)
 
-        self.layout.addStretch()
+        # Add flexible space between sections and buttons
+        self.layout.addStretch(1)
 
         # --- Dialog Buttons ---
-        self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel | QDialogButtonBox.Apply)
-        self.layout.addWidget(self.button_box)
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(10)
+        self.button_box = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        self.button_box.button(QDialogButtonBox.Save).setText("Speichern")
+        self.button_box.button(QDialogButtonBox.Cancel).setText("Abbrechen")
+        button_layout.addStretch(1)
+        button_layout.addWidget(self.button_box)
+        self.layout.addLayout(button_layout)
 
         # --- Connect Signals ---
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
-        self.button_box.button(QDialogButtonBox.Apply).clicked.connect(self.save_settings)
-
-    def load_settings(self):
-        """Load settings from the manager and populate the UI fields."""
-        # Load general settings
-        app_s = settings.data
-        self.editWorkDir.setText(str(app_s.work_dir))
-        self.editBackupRoot.setText(str(app_s.backup_root))
-        self.editUnsortedRoot.setText(str(app_s.unsorted_root))
-
-        # Load LLM settings
-        llm_s = settings.data.llm
-        self.cmbProvider.setCurrentText(llm_s.provider)
-        self.editOpenAIKey.setText(llm_s.openai_api_key)
-        self.editOpenAIModel.setText(llm_s.openai_model)
-        self.editAzureEndpoint.setText(llm_s.azure_endpoint)
-        self.editAzureDeployment.setText(llm_s.azure_deployment)
-        self.editAzureKey.setText(llm_s.azure_api_key)
-        self.editAzureApiVersion.setText(llm_s.azure_api_version)
-        self.editOHost.setText(llm_s.ollama_host)
         
-        # The controller will populate the model list, just set the current one
-        if llm_s.ollama_model and not self.cmbOllamaModel.findText(llm_s.ollama_model) > -1:
-             self.cmbOllamaModel.addItem(llm_s.ollama_model)
-        self.cmbOllamaModel.setCurrentText(llm_s.ollama_model)
+        # Connect directory button signals
+        self.btnWorkDir.clicked.connect(lambda: self._select_directory(self.editWorkDir))
+        self.btnBackupRoot.clicked.connect(lambda: self._select_directory(self.editBackupRoot))
+        self.btnUnsortedRoot.clicked.connect(lambda: self._select_directory(self.editUnsortedRoot))
+        # Connect signals to clear test results when inputs change
+        self.editOpenAIKey.textChanged.connect(self.lblTestResultOpenAI.hide)
+        self.cmbOpenAIModel.editTextChanged.connect(self.lblTestResultOpenAI.hide)
+        self.editAzureEndpoint.textChanged.connect(self.lblTestResultAzure.hide)
+        self.editAzureKey.textChanged.connect(self.lblTestResultAzure.hide)
+        self.editAzureApiVersion.textChanged.connect(self.lblTestResultAzure.hide)
+        self.editAzureDeploymentName.textChanged.connect(self.lblTestResultAzure.hide)
+        self.editOllamaBaseUrl.textChanged.connect(self.lblTestResultOllama.hide)
+        self.cmbOllamaModel.editTextChanged.connect(self.lblTestResultOllama.hide)
+        self.cmbProvider.currentIndexChanged.connect(self.clear_all_test_results)
 
-    def save_settings(self):
-        """Save settings from the UI fields to the manager."""
-        # Save general settings
-        app_s = settings.data
-        app_s.work_dir = Path(self.editWorkDir.text())
-        app_s.backup_root = Path(self.editBackupRoot.text())
-        app_s.unsorted_root = Path(self.editUnsortedRoot.text())
+        # Signal connections for test button states are now handled in the controller
 
-        # Save LLM settings
-        llm_s = settings.data.llm
-        llm_s.provider = self.cmbProvider.currentText()
-        llm_s.openai_api_key = self.editOpenAIKey.text()
-        llm_s.openai_model = self.editOpenAIModel.text()
-        llm_s.azure_endpoint = self.editAzureEndpoint.text()
-        llm_s.azure_deployment = self.editAzureDeployment.text()
-        llm_s.azure_api_key = self.editAzureKey.text()
-        llm_s.azure_api_version = self.editAzureApiVersion.text()
-        llm_s.ollama_host = self.editOHost.text()
-        llm_s.ollama_model = self.cmbOllamaModel.currentText()
-        settings.save()
+        # Set initial provider form
+        self._on_provider_changed(self.cmbProvider.currentIndex())
+
+    def show_test_result(self, provider_name: str, success: bool, message: str):
+        """Displays the connection test result under the corresponding button."""
+        label_map = {
+            'openai': self.lblTestResultOpenAI,
+            'azure': self.lblTestResultAzure,
+            'ollama': self.lblTestResultOllama
+        }
+        label = label_map.get(provider_name)
+
+        if label:
+            label.setText(message)
+            label.setAlignment(Qt.AlignLeft)
+            color = "green" if success else "red"
+            label.setStyleSheet(f"color: {color};")
+            label.setWordWrap(True)
+            label.show()
+
+    def clear_all_test_results(self):
+        """Hides all test result labels."""
+        self.lblTestResultOpenAI.hide()
+        self.lblTestResultAzure.hide()
+        self.lblTestResultOllama.hide()
+
+    def set_buttons_enabled(self, enabled: bool):
+        """Enables or disables all buttons that trigger long-running operations."""
+        # Disable/enable test buttons
+        self.btnTestOpenAI.setEnabled(enabled)
+        self.btnTestAzure.setEnabled(enabled)
+        self.btnTestOllama.setEnabled(enabled)
+
+        # Also disable/enable standard dialog buttons
+        self.button_box.button(QDialogButtonBox.Save).setEnabled(enabled)
+        self.button_box.button(QDialogButtonBox.Cancel).setEnabled(enabled)
+
+    def _create_group_box(self, title):
+        """Helper to create consistently styled group boxes"""
+        group_box = QGroupBox(title)
+        font = QFont()
+        font.setBold(True)
+        font.setPointSize(11)
+        group_box.setFont(font)
+        group_box.setStyleSheet("QGroupBox { margin-top: 15px; padding-top: 15px; }")
+        return group_box
+        
+    def _on_provider_changed(self, index):
+        """Switch the provider form when selection changes"""
+        self.clear_all_test_results()
+        self.stwProviderForms.setCurrentIndex(index)
+        
+    def _select_directory(self, line_edit):
+        """Open directory selection dialog and update the line edit"""
+        from PySide6.QtWidgets import QFileDialog
+        current_dir = line_edit.text() or str(Path.home())
+        directory = QFileDialog.getExistingDirectory(self, "Verzeichnis auswählen", current_dir)
+        if directory:
+            line_edit.setText(directory)
 
     def accept(self):
         """Save settings and close the dialog."""
-        self.save_settings()
+        self.controller.save()
         super().accept()

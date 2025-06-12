@@ -11,7 +11,7 @@ from PySide6.QtWidgets import QApplication
 from aidocsynth.models.job import Job
 from aidocsynth.utils.worker import Worker
 from aidocsynth.services.settings_service import settings
-from aidocsynth.services.file_manager import backup_original, copy_sorted, copy_unsorted, get_directory_structure, sort_and_copy_document, get_file_metadata
+from aidocsynth.services.file_manager import FileManager
 from aidocsynth.services.text_pipeline import full_text
 from aidocsynth.services.providers.base import get_provider
 from aidocsynth.services.classification_service import ClassificationService
@@ -31,6 +31,7 @@ class MainController(QObject):
         self.process_pool = ProcessPoolExecutor(max_workers=max_proc)
         self.active_jobs = 0
         self.workers = set()
+        self.file_manager = FileManager(self.config_manager.data)
 
     def close(self):
         """Shuts down the process pool gracefully on application exit."""
@@ -99,7 +100,10 @@ class MainController(QObject):
 
     async def _backup_file(self, job, src_path):
         await self._update_job_progress(job, 10, "backing up", "1/5")
-        backup_original(src_path, self.config_manager.data)
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            self.process_pool, self.file_manager.backup_original, src_path
+        )
 
     async def _extract_text_ocr(self, job, src_path):
         await self._update_job_progress(job, 30, "extracting text", "2/5")
@@ -119,14 +123,14 @@ class MainController(QObject):
             # 2. Instantiate classification service
             classification_service = ClassificationService(llm_provider)
 
-            # 3. Get directory structure for the prompt context
-            work_dir = self.config_manager.data.work_dir
-            dir_tuples = get_directory_structure(str(work_dir))
-            # Format the directory structure with file counts for the prompt
-            directory_structure = [f"{path} ({count} files)" for path, count in dir_tuples]
+            loop = asyncio.get_running_loop()
 
-            # 4. Get file metadata
-            file_metadata = get_file_metadata(Path(job.path))
+            # 3. Get directory structure and metadata in the background.
+            # This runs I/O operations in the executor pool to avoid blocking.
+            directory_structure, file_metadata = await asyncio.gather(
+                loop.run_in_executor(self.process_pool, self.file_manager.get_formatted_directory_structure),
+                loop.run_in_executor(self.process_pool, self.file_manager.get_file_metadata, Path(job.path))
+            )
 
             # 5. Call the service to perform classification
             classification_data = await classification_service.classify_document(
@@ -144,19 +148,17 @@ class MainController(QObject):
             if llm_provider:
                 await llm_provider.close()
 
-    async def _sort_file(self, job, src_path, classification_data):
-        await self._update_job_progress(job, 90, "sorting", "4/5")
+    async def _process_file(self, job, src_path, classification_data):
+        await self._update_job_progress(job, 90, "processing", "4/5")
         
-        # Delegate sorting to the file manager service
+        # Delegate final processing to the file manager service
         loop = asyncio.get_running_loop()
-        job.status = await loop.run_in_executor(
+        await loop.run_in_executor(
             self.process_pool,
-            sort_and_copy_document, 
+            self.file_manager.process_document, 
             src_path, 
-            classification_data, 
-            self.config_manager.data
+            classification_data
         )
-        self.jobUpdated.emit(job)
 
     async def _pipeline(self, job):
         """The main processing pipeline for a single file."""
@@ -166,7 +168,7 @@ class MainController(QObject):
             await self._backup_file(job, src_path)
             text_content = await self._extract_text_ocr(job, src_path)
             classification_data = await self._classify_document(job, text_content)
-            await self._sort_file(job, src_path, classification_data)
+            await self._process_file(job, src_path, classification_data)
 
             await self._update_job_progress(job, 100, "completed", "5/5")
             return job

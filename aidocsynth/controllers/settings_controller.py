@@ -1,159 +1,194 @@
-from PySide6.QtCore import QObject, Signal, QThread
-from PySide6.QtWidgets import QFileDialog, QLineEdit
-import logging
-from functools import partial
-
+from pathlib import Path
+from PySide6.QtCore import QObject, Signal, Qt, QThreadPool
 from aidocsynth.services.settings_service import settings
-from aidocsynth.services.providers.ollama_provider import OllamaProvider
-import asyncio
+from aidocsynth.services import providers
+from aidocsynth.utils.worker import Worker
+from aidocsynth.utils.connection_utils import test_provider_connection
+from aidocsynth.utils.async_worker import fetch_models_async
+import logging, asyncio
 
-logger = logging.getLogger(__name__)
-
-class OllamaModelsFetcherThread(QThread):
-    modelsFetched = Signal(list)
-
-    def __init__(self, llm_settings, parent=None):
-        super().__init__(parent)
-        self.llm_settings = llm_settings
-        self._loop = None # Store the loop to close it later
-
-    async def _fetch_models_async(self):
-        prov = OllamaProvider(self.llm_settings)
-        try:
-            models = await prov.list_models()
-            return models
-        except Exception as e:
-            logger.error(f"Could not load Ollama models: {e}", exc_info=True)
-            return []
-
-    def run(self):
-        try:
-            self._loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(self._loop)
-            models = self._loop.run_until_complete(self._fetch_models_async())
-            self.modelsFetched.emit(models or ["llama3"])
-        except RuntimeError as e:
-            logger.warning(f"RuntimeError in OllamaModelsFetcherThread, trying existing loop: {e}")
-            try:
-                self._loop = asyncio.get_event_loop()
-                if not self._loop.is_running(): # Ensure we only run if not already running
-                    models = self._loop.run_until_complete(self._fetch_models_async())
-                    self.modelsFetched.emit(models or ["llama3"])
-                else:
-                    logger.warning("Existing loop is already running, cannot fetch models.")
-                    self.modelsFetched.emit(["llama3"]) # Fallback
-            except Exception as ex_inner:
-                logger.error(f"Failed to fetch Ollama models even with existing loop: {ex_inner}", exc_info=True)
-                self.modelsFetched.emit(["llama3"]) # Fallback
-        except Exception as ex_outer:
-            logger.error(f"Failed to fetch Ollama models: {ex_outer}", exc_info=True)
-            self.modelsFetched.emit(["llama3"]) # Fallback
-        finally:
-            if self._loop and not self._loop.is_closed():
-                self._loop.close()
-                logger.debug("Asyncio loop in OllamaModelsFetcherThread closed.")
+log = logging.getLogger(__name__)
 
 class SettingsController(QObject):
-    ollamaModelsLoaded = Signal(list)
+    modelsReady = Signal(str, list)           # provider, model-liste
+    testDone    = Signal(str, bool, str)      # provider, ok, msg
 
-    def __init__(self, dlg):
-        super().__init__()
-        self.dlg = dlg
-        self.fetcher_thread = None
+    def __init__(self, view):
+        super().__init__(view)
+        self.v  = view
+        self._pool = QThreadPool.globalInstance()
 
-        self.ollamaModelsLoaded.connect(self._update_ollama_models_combo)
-        self.dlg.cmbProvider.currentTextChanged.connect(self._switch)
+        # UI-Bindings
+        self.v.cmbProvider.currentTextChanged.connect(self._switch_provider)
+        self.v.btnTestOpenAI.clicked .connect(lambda: self._test('openai'))
+        self.v.btnTestAzure.clicked  .connect(lambda: self._test('azure'))
+        self.v.btnTestOllama.clicked .connect(lambda: self._test('ollama'))
+        self.modelsReady.connect(self._populate_models)
+        self.testDone.connect(self.v.show_test_result)
+        self.testDone.connect(self._handle_successful_test)
 
-        # Connect directory selection buttons
-        self.dlg.btnWorkDir.clicked.connect(partial(self._select_directory, self.dlg.editWorkDir))
-        self.dlg.btnBackupRoot.clicked.connect(partial(self._select_directory, self.dlg.editBackupRoot))
-        self.dlg.btnUnsortedRoot.clicked.connect(partial(self._select_directory, self.dlg.editUnsortedRoot))
+        # Connect text changed signals to update button states
+        self.v.editOpenAIKey.textChanged.connect(self._update_test_button_states)
+        self.v.editAzureEndpoint.textChanged.connect(self._update_test_button_states)
+        self.v.editAzureKey.textChanged.connect(self._update_test_button_states)
+        self.v.editAzureApiVersion.textChanged.connect(self._update_test_button_states)
+        self.v.editOllamaBaseUrl.textChanged.connect(self._update_test_button_states)
 
-        self._switch(self.dlg.cmbProvider.currentText()) # Initial call
+        self.load()
+        self._update_test_button_states() # Set initial state
 
-    def __del__(self):
-        logger.debug(f"SettingsController {id(self)} is being deleted. Cleaning up fetcher thread.")
-        self.cleanup()
+    # ---------------------------------------------------------------- #
+    #   Public API                                                     #
+    # ---------------------------------------------------------------- #
+    def load(self):
+        """Model → View"""
+        s, llm = settings.data, settings.data.llm
+        self.v.editWorkDir.setText(str(s.work_dir))
+        self.v.editBackupRoot.setText(str(s.backup_root))
+        self.v.editUnsortedRoot.setText(str(s.unsorted_root))
+        self.v.chkCreateBackup.setChecked(s.create_backup)
+        self.v.cmbBackupAction.setCurrentText("Kopieren" if s.sort_action=="copy" else "Verschieben")
 
-    def cleanup(self):
-        if hasattr(self, 'fetcher_thread') and self.fetcher_thread:
-            try:
-                if self.fetcher_thread.isRunning():
-                    logger.info("Stopping Ollama models fetcher thread...")
-                    self.fetcher_thread.quit() # Signal the thread to finish its event loop (if any)
-                    # Wait for the thread to finish. Timeout after 5 seconds.
-                    if not self.fetcher_thread.wait(5000): 
-                        logger.warning("Ollama models fetcher thread did not finish gracefully. Terminating.")
-                        self.fetcher_thread.terminate() # Forcefully terminate if it doesn't stop
-                        self.fetcher_thread.wait() # Wait for termination to complete
-                    else:
-                        logger.info("Ollama models fetcher thread finished gracefully.")
-            except RuntimeError:
-                # This can happen if the C++ part of the QThread object is already deleted
-                # by Qt's parent-child mechanism before this cleanup method is called.
-                logger.warning("Could not clean up fetcher thread, it was likely already deleted.")
-            finally:
-                self.fetcher_thread = None # Clear the reference to allow GC
+        self.v.cmbProvider.setCurrentText(llm.provider)
+        self.v.editOpenAIKey.setText(llm.openai_api_key or "")
+        self.v.cmbOpenAIModel.setEditText(llm.openai_model)
+        self.v.editAzureEndpoint     .setText(llm.azure_endpoint or "")
+        self.v.editAzureDeploymentName.setText(llm.azure_deployment or "")
+        self.v.editAzureKey          .setText(llm.azure_api_key or "")
+        self.v.editAzureApiVersion   .setText(llm.azure_api_version)
+        self.v.editOllamaBaseUrl     .setText(llm.ollama_host)
+        self.v.cmbOllamaModel.setEditText(llm.ollama_model)
+        self._switch_provider(llm.provider)
 
-    def _switch(self, prov: str):
-        self.dlg.stwProviderForms.setCurrentIndex({"openai":0,"azure":1,"ollama":2}[prov])
-        if prov == "ollama":
-            self._load_ollama_models_threaded()
+    def save(self):
+        """View → Model"""
+        s, llm = settings.data, settings.data.llm
+        s.work_dir      = Path(self.v.editWorkDir.text())
+        s.backup_root   = Path(self.v.editBackupRoot.text())
+        s.unsorted_root = Path(self.v.editUnsortedRoot.text())
+        s.create_backup = self.v.chkCreateBackup.isChecked()
+        s.sort_action   = "copy" if self.v.cmbBackupAction.currentText()=="Kopieren" else "move"
 
-    def _load_ollama_models_threaded(self):
-        if self.fetcher_thread and self.fetcher_thread.isRunning():
-            logger.debug("Ollama models fetcher thread already running. Not starting a new one.")
-            return 
-        self.fetcher_thread = OllamaModelsFetcherThread(settings.data.llm, self) # Parent is self
-        self.fetcher_thread.modelsFetched.connect(self.ollamaModelsLoaded)
-        self.fetcher_thread.start()
+        llm.provider        = self.v.cmbProvider.currentText()
+        llm.openai_api_key  = self.v.editOpenAIKey.text().strip() or None
+        llm.openai_model    = self.v.cmbOpenAIModel.currentText().strip()
+        llm.azure_endpoint  = self.v.editAzureEndpoint.text().strip() or None
+        llm.azure_deployment= self.v.editAzureDeploymentName.text().strip() or None
+        llm.azure_api_key   = self.v.editAzureKey.text().strip() or None
+        llm.azure_api_version = self.v.editAzureApiVersion.text().strip() or llm.azure_api_version
+        llm.ollama_host     = self.v.editOllamaBaseUrl.text().strip()
+        llm.ollama_model    = self.v.cmbOllamaModel.currentText().strip()
 
-    def _update_ollama_models_combo(self, models):
-        current_model = self.dlg.cmbOllamaModel.currentText()
-        self.dlg.cmbOllamaModel.clear()
-        self.dlg.cmbOllamaModel.addItems(models)
-        if current_model in models:
-            self.dlg.cmbOllamaModel.setCurrentText(current_model)
-        elif models:
-            self.dlg.cmbOllamaModel.setCurrentIndex(0)
+        settings.save()
 
-    def _select_directory(self, line_edit_widget: QLineEdit):
-        """Opens a dialog to select a directory and updates the line edit."""
-        # Use the current path in the line edit as the starting directory
-        start_dir = line_edit_widget.text()
-        if not start_dir:
-            start_dir = "/"
+    # ---------------------------------------------------------------- #
+    #   Interne Helfer                                                 #
+    # ---------------------------------------------------------------- #
+    def _switch_provider(self, provider: str):
+        idx = {"openai":0, "azure":1, "ollama":2}.get(provider,0)
+        self.v.stwProviderForms.setCurrentIndex(idx)
+        self._update_test_button_states()
 
-        directory = QFileDialog.getExistingDirectory(
-            self.dlg, # Parent
-            "Verzeichnis auswählen",
-            start_dir
+        # Lazy load models if credentials are provided
+        should_load = False
+        if provider == "openai":
+            should_load = self.v.btnTestOpenAI.isEnabled()
+        elif provider == "azure":
+            should_load = self.v.btnTestAzure.isEnabled()
+        elif provider == "ollama":
+            should_load = self.v.btnTestOllama.isEnabled()
+
+        if should_load:
+            log.info(f"Credentials for '{provider}' are present, attempting to load models...")
+            self._load_models(provider)
+
+    def _load_models(self, provider: str):
+        log.info(f"Lazy loading models for provider: {provider}")
+        cfg = self._collect_temp_cfg()
+        prov_cls = providers.get_provider(cfg).__class__
+        log.debug(f"Using provider class '{prov_cls.__name__}' for model loading.")
+        worker = fetch_models_async(prov_cls, cfg)
+        worker.sig.result.connect(lambda models: self.modelsReady.emit(provider, models))
+        self._pool.start(worker)
+
+    def _populate_models(self, provider: str, models: list[str]):
+        log.info(f"Populating model list for '{provider}' with {len(models)} models.")
+        combo = {
+            "openai": self.v.cmbOpenAIModel,
+            "ollama": self.v.cmbOllamaModel
+        }.get(provider)
+
+        if not combo:
+            log.warning(f"Could not find a combo box for provider '{provider}' to populate.")
+            return
+
+        current = combo.currentText()
+        log.debug(f"Current text in combobox for '{provider}': '{current}'")
+        combo.clear()
+        if models:
+            combo.addItems(models)
+            log.debug(f"Added {len(models)} models to combobox for '{provider}'.")
+            if current in models:
+                combo.setCurrentText(current)
+                log.debug(f"Restored current selection to '{current}'.")
+            else:
+                combo.setCurrentText(models[0])
+                log.debug(f"Set selection to first model in list: '{models[0]}'.")
+        else:
+            log.warning(f"Received an empty model list for provider '{provider}'. Combobox is empty.")
+
+    # ---------------------------------------------------------------- #
+    #   Connection-Test                                                #
+    # ---------------------------------------------------------------- #
+    def _test(self, provider: str):
+        log.info(f"Starting connection test for provider: {provider}")
+        cfg = self._collect_temp_cfg()
+
+        async def _run(signals):
+            success, message = await test_provider_connection(cfg)
+            signals.result.emit((success, message))
+
+        worker = Worker(_run)
+        worker.sig.result.connect(lambda res: self.testDone.emit(provider, *res))
+        self._pool.start(worker)
+
+    # ---------------------------------------------------------------- #
+    def _handle_successful_test(self, provider: str, success: bool, message: str):
+        """If a test is successful, (re)load the models for that provider."""
+        if success:
+            log.info(f"Connection test for '{provider}' was successful, refreshing model list.")
+            self._load_models(provider)
+
+    def _update_test_button_states(self):
+        """Enables or disables the test buttons based on required fields."""
+        # OpenAI
+        openai_ready = bool(self.v.editOpenAIKey.text().strip())
+        self.v.btnTestOpenAI.setEnabled(openai_ready)
+
+        # Azure
+        azure_ready = all([
+            self.v.editAzureEndpoint.text().strip(),
+            self.v.editAzureKey.text().strip(),
+            self.v.editAzureApiVersion.text().strip(),
+        ])
+        self.v.btnTestAzure.setEnabled(azure_ready)
+
+        # Ollama
+        ollama_ready = bool(self.v.editOllamaBaseUrl.text().strip())
+        self.v.btnTestOllama.setEnabled(ollama_ready)
+
+    def _collect_temp_cfg(self):
+        """Liest aktuelle UI-Werte in ein frisches `LLMSettings`-Objekt."""
+        from aidocsynth.models.settings import LLMSettings
+        return LLMSettings(
+            provider        = self.v.cmbProvider.currentText(),
+            openai_api_key  = self.v.editOpenAIKey.text().strip() or None,
+            openai_model    = self.v.cmbOpenAIModel.currentText().strip() or "gpt-4o-mini",
+            azure_endpoint  = self.v.editAzureEndpoint.text().strip() or None,
+            azure_deployment= self.v.editAzureDeploymentName.text().strip() or None,
+            azure_api_key   = self.v.editAzureKey.text().strip() or None,
+            azure_api_version = self.v.editAzureApiVersion.text().strip() or "2024-02-01",
+            ollama_host     = self.v.editOllamaBaseUrl.text().strip(),
+            ollama_model    = self.v.cmbOllamaModel.currentText().strip() or "llama3"
         )
-        if directory:
-            line_edit_widget.setText(directory)
 
-    def _update_openai_model_field(self):
-        llm_s = settings.data.llm
-        self.dlg.editOpenAIModel.setText(llm_s.openai_model)
-
-    def _save_openai_model_field(self):
-        llm_s = settings.data.llm
-        llm_s.openai_model = self.dlg.editOpenAIModel.text()
-
-    def _update_azure_api_version_field(self):
-        llm_s = settings.data.llm
-        self.dlg.editAzureApiVersion.setText(llm_s.azure_api_version)
-
-    def _save_azure_api_version_field(self):
-        llm_s = settings.data.llm
-        llm_s.azure_api_version = self.dlg.editAzureApiVersion.text()
-
-    def load_settings(self):
-        self._update_openai_model_field()
-        self._update_azure_api_version_field()
-        # ... (rest of the method remains the same)
-
-    def save_settings(self):
-        self._save_openai_model_field()
-        self._save_azure_api_version_field()
-        # ... (rest of the method remains the same)
