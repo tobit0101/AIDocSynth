@@ -155,7 +155,7 @@ class FileManager:
     def process_document(self, src_path: Path, classification_data: dict) -> Optional[Path]:
         """Sorts a document by copying or moving it to the target directory based on settings.
 
-        The *classification_data* must contain a ``target_path`` key that either
+        The *classification_data* must contain a ``target_directory`` key that either
         holds a **relative** path inside the workspace or an **absolute** path
         that still points into the workspace. Any attempt to escape the
         workspace raises an exception and the document will be placed in the
@@ -163,22 +163,22 @@ class FileManager:
         """
         src_name = src_path.name
         try:
-            target_path_str = classification_data['target_path']
-            file_name = classification_data['file_name']
+            target_directory_str = classification_data['target_directory']
+            target_filename = classification_data['target_filename']
 
             # Ensure the target file name contains exactly the same extension as the
             # source (case-insensitive). If absent or different, enforce the
             # original suffix in lowercase to keep consistency.
             src_suffix_lower = src_path.suffix.lower()
-            dst_suffix_lower = Path(file_name).suffix.lower()
+            dst_suffix_lower = Path(target_filename).suffix.lower()
             if dst_suffix_lower == "" or dst_suffix_lower != src_suffix_lower:
                 # Strip any wrong extension and append correct one
-                file_name = f"{Path(file_name).stem}{src_suffix_lower}"
+                target_filename = f"{Path(target_filename).stem}{src_suffix_lower}"
                 logger.debug(
-                    f"[{src_name}] Harmonised file extension. Using '{src_suffix_lower}' -> '{file_name}'."
+                    f"[{src_name}] Harmonised file extension. Using '{src_suffix_lower}' -> '{target_filename}'."
                 )
 
-            raw_target = Path(target_path_str)
+            raw_target = Path(target_directory_str)
             # Relative paths are interpreted relative to the workspace, absolute
             # paths are validated to still be inside the workspace.
             if raw_target.is_absolute():
@@ -187,15 +187,15 @@ class FileManager:
                 dst_dir = self._ensure_within_work_dir(self.cfg.work_dir / raw_target)
             
             action_verb = "Moving" if self.cfg.sort_action == "move" else "Copying"
-            logger.info(f"[{src_name}] {action_verb} file to '{target_path_str}' as '{file_name}'...")
+            logger.info(f"[{src_name}] {action_verb} file to '{target_directory_str}' as '{target_filename}'...")
 
             if self.cfg.sort_action == "move":
                 if not src_path.exists():
                     logger.error(f"Source file '{src_path}' does not exist. Cannot move.")
                     return None
-                new_path = self._move_with_versioning(src_path, dst_dir, file_name)
+                new_path = self._move_with_versioning(src_path, dst_dir, target_filename)
             else: # Default to "copy"
-                new_path = self._copy_with_versioning(src_path, dst_dir, file_name)
+                new_path = self._copy_with_versioning(src_path, dst_dir, target_filename)
 
             logger.info(f"[{src_name}] -> Success. Processing finished. New path: {new_path}")
             return new_path

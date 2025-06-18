@@ -43,27 +43,27 @@ class ClassificationService:
         if directory_structure is None:
             directory_structure = []
 
-        file_name_string = Path(file_path).name
+        target_filename_string = Path(file_path).name
         metadata_string = json.dumps(metadata, indent=2, ensure_ascii=False)
         content_string = text_content
         directory_structure_json = json.dumps(directory_structure, indent=2, ensure_ascii=False)
 
         system_prompt = self.system_prompt_template.render()
         user_prompt = self.user_prompt_template.render(
-            file_name_string=file_name_string,
+            target_filename_string=target_filename_string,
             metadata_string=metadata_string,
             content_string=content_string,
             directory_structure_json=directory_structure_json
         )
 
         self.logger.debug(f"System Prompt:\n{system_prompt}")
-        self.logger.debug(f"User Prompt for {file_name_string}:\n{user_prompt}")
+        self.logger.debug(f"User Prompt for {target_filename_string}:\n{user_prompt}")
 
         # Start overall timer to measure processing duration
         overall_start = time.perf_counter()
 
         # Retry loop – ensures we get at least a JSON object that contains
-        # the mandatory keys: "file_name" and "target_path".
+        # the mandatory keys: "target_filename" and "target_directory".
         last_error: Exception | None = None
         for attempt in range(1, self.max_retries + 1):
             try:
@@ -81,17 +81,17 @@ class ClassificationService:
                 # Validate minimal schema
                 if not (
                     isinstance(classification_data, dict)
-                    and "file_name" in classification_data
-                    and "target_path" in classification_data
+                    and "target_filename" in classification_data
+                    and "target_directory" in classification_data
                 ):
                     raise ValueError(
-                        "Invalid classification result – missing required keys 'file_name' and/or 'target_path'."
+                        "Invalid classification result – missing required keys 'target_filename' and/or 'target_directory'."
                     )
 
                 # Success – log and return (include timing)
                 overall_duration = time.perf_counter() - overall_start
                 self.logger.info(
-                    f"Successfully classified {file_name_string} on attempt {attempt} in {overall_duration:.2f}s."
+                    f"Successfully classified {target_filename_string} on attempt {attempt} in {overall_duration:.2f}s."
                 )
                 return classification_data
 
@@ -99,13 +99,13 @@ class ClassificationService:
                 # Response content error – potentially recoverable
                 last_error = e
                 self.logger.warning(
-                    f"Attempt {attempt} for {file_name_string} returned an invalid response: {e}"
+                    f"Attempt {attempt} for {target_filename_string} returned an invalid response: {e}"
                 )
             except Exception as e:
                 # Other, potentially transient error (network, provider error, etc.)
                 last_error = e
                 self.logger.warning(
-                    f"Attempt {attempt} for {file_name_string} failed with error: {e}",
+                    f"Attempt {attempt} for {target_filename_string} failed with error: {e}",
                     exc_info=True,
                 )
 

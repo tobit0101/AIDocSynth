@@ -73,6 +73,7 @@ class OllamaProvider(ProviderBase):
             model=self.model,
             messages=messages,
             stream=False,
+            format="json",
             options={"temperature": 0.2}
         )
         return resp["message"]["content"]
