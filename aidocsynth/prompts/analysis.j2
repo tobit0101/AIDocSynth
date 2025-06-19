@@ -1,16 +1,16 @@
-Quelldatei: '{{ filename }}'
+Quelldatei: `{{ target_filename_string }}`
 
 Metadaten: 
-----------------
-{{ meta | tojson }}
-----------------
+```json
+{{ metadata_string }}
+```
 
 Inhalt: 
-----------------
-{{ content }}
-----------------
+```text
+{{ content_string }}
+```
 
 Verzeichnisstruktur:
-----------------
-{{ directory_structure }}
-----------------
+```text
+{{ directory_structure_json }}
+```

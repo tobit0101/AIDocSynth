@@ -5,8 +5,9 @@ from pathlib import Path
 from functools import partial
 from concurrent.futures import ProcessPoolExecutor
 
-from PySide6.QtCore import QObject, Signal, QThreadPool, Slot
+from PySide6.QtCore import QObject, Signal, QThreadPool, Slot, QUrl
 from PySide6.QtWidgets import QApplication
+from PySide6.QtGui import QDesktopServices
 
 from aidocsynth.models.job import Job
 from aidocsynth.utils.worker import Worker
@@ -23,9 +24,11 @@ class MainController(QObject):
     jobAdded = Signal(Job); jobUpdated = Signal(Job)
     ocr_status_changed = Signal(str) # message
 
-    def __init__(self, config_manager):
+    def __init__(self, config_manager, view): # Added view parameter
         super().__init__()
         self.config_manager = config_manager
+        self.view = view # Store view reference
+        self._current_work_dir_display = "" # Store current displayed path
         self.logger = logging.getLogger(self.__class__.__name__)
         self.pool = QThreadPool.globalInstance()
         # Limit workers to avoid starving the system, leave one core for UI/OS
@@ -34,6 +37,16 @@ class MainController(QObject):
         self.active_jobs = 0
         self.workers = set()
         self.file_manager = FileManager(self.config_manager.data)
+
+        # Initialize working directory label in the view
+        if self.view and hasattr(self.view, 'update_workdir_label'):
+            initial_work_dir = str(self.config_manager.data.work_dir)
+            self.view.update_workdir_label(initial_work_dir)
+            self._current_work_dir_display = initial_work_dir
+
+        # Connect to settings changes
+        if hasattr(self.config_manager, 'settings_changed'):
+            self.config_manager.settings_changed.connect(self._handle_settings_changed)
 
     def close(self):
         """Shuts down the process pool gracefully on application exit."""
@@ -203,6 +216,37 @@ class MainController(QObject):
         
         dialog = AboutDialogView(parent=parent_window)
         dialog.exec()
+
+    def open_working_directory(self):
+        """Opens the configured working directory in the system's file explorer."""
+        work_dir_path = str(self.config_manager.data.work_dir)
+        self.logger.info(f"Attempting to open working directory: {work_dir_path}")
+        if not os.path.exists(work_dir_path):
+            self.logger.warning(f"Working directory does not exist: {work_dir_path}")
+            # Optionally, inform the user via a status bar message or dialog
+            # For now, just log a warning.
+            if self.view and hasattr(self.view, 'ocr_status_label'): # Use ocr_status_label for temp messages
+                 self.view.ocr_status_label.setText(f"Fehler: Arbeitsverzeichnis nicht gefunden: {work_dir_path}")
+            return
+        
+        url = QUrl.fromLocalFile(work_dir_path)
+        if not QDesktopServices.openUrl(url):
+            self.logger.error(f"Failed to open working directory: {work_dir_path}")
+            # Optionally, inform the user
+            if self.view and hasattr(self.view, 'ocr_status_label'):
+                 self.view.ocr_status_label.setText(f"Fehler: Konnte Arbeitsverzeichnis nicht öffnen: {work_dir_path}")
+
+    @Slot()
+    def _handle_settings_changed(self):
+        """Handles the settings_changed signal from SettingsService."""
+        new_work_dir = str(self.config_manager.data.work_dir)
+        if new_work_dir != self._current_work_dir_display:
+            self.logger.info(f"Working directory changed from '{self._current_work_dir_display}' to '{new_work_dir}'. Updating label.")
+            if self.view and hasattr(self.view, 'update_workdir_label'):
+                self.view.update_workdir_label(new_work_dir)
+                self._current_work_dir_display = new_work_dir
+        else:
+            self.logger.debug("Settings changed, but working directory remains the same.")
 
     # ------------------------------------------------------------------
     # Helper Methods

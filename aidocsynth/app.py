@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import QApplication, QSystemTrayIcon, QMenu
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QIcon, QCursor
 from PySide6.QtCore import QTimer, QThreadPool
 import sys
 import signal
@@ -28,52 +28,7 @@ from .controllers.main_controller import MainController
 from .services.settings_service import settings
 from .controllers.settings_controller import SettingsController
 from .utils.worker import Worker
-
-def setup_tray_icon(parent_app):
-    """Creates and sets up the system tray icon."""
-    # Load the icon from the file system to bypass potential resource system issues.
-    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-        # Running in a PyInstaller bundle
-        base_path = sys._MEIPASS
-        icon_path = os.path.join(base_path, 'aidocsynth', 'ui', 'resources', 'app_tray.png')
-    else:
-        # Running in a normal Python environment
-        script_dir = os.path.dirname(os.path.realpath(__file__))
-        icon_path = os.path.join(script_dir, "ui", "resources", "app_tray.png")
-    
-    icon = QIcon(icon_path)
-    if icon.isNull():
-        logging.getLogger("AIDocSynth").error(f"Failed to load tray icon from path: {icon_path}")
-        return None
-
-    tray_icon = QSystemTrayIcon(icon, parent_app)
-    tray_menu = QMenu()
-
-    # Add 'About' option
-    if hasattr(parent_app, 'main_controller') and hasattr(parent_app.main_controller, 'show_about_dialog'):
-        about_action = tray_menu.addAction("Über AIDocSynth")
-        about_action.triggered.connect(parent_app.main_controller.show_about_dialog)
-        tray_menu.addSeparator()
-
-    if hasattr(parent_app, 'settings_dialog'):
-        tray_menu.addAction("Einstellungen", parent_app.settings_dialog.show)
-        tray_menu.addSeparator()
-    tray_menu.addAction("Beenden", parent_app.quit)
-    tray_icon.setContextMenu(tray_menu)
-
-    def on_tray_activated(reason):
-        # Show the window on left-click
-        if reason == QSystemTrayIcon.ActivationReason.Trigger:
-            main_win = QApplication.instance().main_window
-            if main_win:
-                main_win.show()
-                main_win.raise_()
-                main_win.activateWindow()
-
-    tray_icon.activated.connect(on_tray_activated)
-
-    tray_icon.show()
-    return tray_icon
+from .ui.tray_icon_manager import setup_tray_icon # Import from new module
 
 def load_main_application(splash):
     """
@@ -163,17 +118,20 @@ def main():
     from .services.settings_service import settings
 
     # --- Main UI Setup --- 
-    # Create the main controller, injecting the necessary dependencies.
-    # The view is set to None initially to break the circular dependency.
+    # Create the main window view. The controller will be set later.
+    main_window = MainWindowView(controller=None)
+
+    # Create the main controller, injecting the necessary dependencies, including the view.
     main_controller = MainController(
-        config_manager=settings
+        config_manager=settings,
+        view=main_window
     )
     
-    # Create the main window view and pass the controller to it.
-    main_window = MainWindowView(controller=main_controller)
-    
-    # Now, assign the created view back to the controller.
-    main_controller.view = main_window
+    # Now, assign the created controller back to the view.
+    main_window.controller = main_controller
+
+    # Connect signals that depend on the controller.
+    main_window.connect_controller_signals()
     
     # Keep references on the app instance
     app.main_window = main_window

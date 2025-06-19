@@ -147,9 +147,9 @@ class FileManager:
         directory_structure = ""
         for path, count in dir_tuples:
             if count > 0:
-                directory_structure += f"./{path} [Files: {count}]\n"
+                directory_structure += f"{path}/ [Files: {count}]\n"
             else:
-                directory_structure += f"./{path}\n"
+                directory_structure += f"{path}/\n"
         return directory_structure
 
     def process_document(self, src_path: Path, classification_data: dict) -> Optional[Path]:
@@ -178,7 +178,10 @@ class FileManager:
                     f"[{src_name}] Harmonised file extension. Using '{src_suffix_lower}' -> '{target_filename}'."
                 )
 
-            raw_target = Path(target_directory_str)
+            # Strip leading slashes to treat paths like '/foo/bar' as relative
+            # if they are not truly absolute system paths.
+            cleaned_target_directory_str = target_directory_str.lstrip('/\\')
+            raw_target = Path(cleaned_target_directory_str)
             # Relative paths are interpreted relative to the workspace, absolute
             # paths are validated to still be inside the workspace.
             if raw_target.is_absolute():

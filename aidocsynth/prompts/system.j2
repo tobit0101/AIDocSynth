@@ -20,8 +20,9 @@ PFLICHTFELDER:
    - FUNKTION: Datum des Dokuments
    - FORMAT: YYYYMMDD
 
-6. main_party
-   - FUNKTION: Hauptbeteiligte Partei
+6. addressed_party
+   - FUNKTION: Adressat des Dokuments aus Anschrift oder Text
+   - LEER: Wenn unbekannt
 
 7. author
    - FUNKTION: Name des Autors
@@ -43,10 +44,8 @@ PFLICHTFELDER:
     - FORMAT: Verzeichnisstruktur mit semantischen Ebenen
     - REGELN:
       * EXAKT bestehenden Pfad verwenden, wenn semantisch passend
-      * Neue Pfade nur wenn nötig erstellen
-      * Schreibweise bestehender Pfade 1:1 übernehmen
-      * Jede Ebene muss semantischen Mehrwert bieten
-      * Vermeide unnötige Hierarchieebenen
+      * Neue Pfade nur erstellen wenn semantisch notwendig
+      * Vermeide unnötige Ebenen
     - EBENEN (nur wenn nötig):
       * Domain/Arbeitsbereich (oberste Ebene)
       * Themenbereich/Fachgebiet
@@ -68,7 +67,7 @@ AUSGABE: AUSSCHLIESSLICH VALIDES JSON-OBJEKT
   "context": "...",
   "yyyymmdd": "YYYYMMDD",
   "document_type": "...",
-  "main_party": "...",
+  "addressed_party": "...",
   "author": "...",
   "description": "...",
   "comment": "...",
