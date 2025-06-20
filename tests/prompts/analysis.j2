@@ -1,16 +1,36 @@
-Quelldatei: '{{ filename }}'
+Quelldatei: `{{ target_filename_string }}`
 
-Metadaten: 
-----------------
-{{ meta | tojson }}
-----------------
+Quellmetadaten: 
+```json
+{{ metadata_string }}
+```
 
-Inhalt: 
-----------------
-{{ content }}
-----------------
+Quelldokument: 
+```text
+{{ content_string }}
+```
 
-Verzeichnisstruktur:
-----------------
-{{ directory_structure }}
-----------------
+Quellverzeichnisstruktur:
+```text
+{{ directory_structure_json }}
+```
+
+---
+
+ZIEL AUSGABE:
+```json
+{
+  "headline": "...",
+  "specifier": "...",
+  "context": "...",
+  "yyyymmdd": "YYYYMMDD",
+  "document_type": "...",
+  "addressed_party": "...",
+  "author": "...",
+  "description": "...",
+  "comment": "...",
+  "keywords": ["...", "...", "..."],
+  "target_directory": "/.../.../.../",
+  "target_filename": "headline_yyyymmdd_specifier.ext"
+}
+```

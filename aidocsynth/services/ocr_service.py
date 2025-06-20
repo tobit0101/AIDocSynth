@@ -1,5 +1,6 @@
 import logging
 from threading import Lock
+from aidocsynth.services.settings_service import settings
 
 _MODEL = None
 _MODEL_ID = "Felix92/doctr-torch-parseq-multilingual-v1"
@@ -78,14 +79,20 @@ def ocr_text(path: str, dpi: int = 300, signals=None) -> str:
     try:
         if file_path.endswith(".pdf"):
             doc = fitz.open(path)
-            images.extend(
-                Image.frombytes("RGB", [p.width, p.height], p.samples)
-                for page in doc
-                for p in [page.get_pixmap(dpi=dpi)]
-            )
+            num_pages_to_process = min(len(doc), settings.data.ocr_max_pages)
+            logger.info(f"Processing {num_pages_to_process} of {len(doc)} pages for OCR based on ocr_max_pages setting ({settings.data.ocr_max_pages}).")
+            for i in range(num_pages_to_process):
+                page = doc.load_page(i)
+                pix = page.get_pixmap(dpi=dpi)
+                images.append(Image.frombytes("RGB", [pix.width, pix.height], pix.samples))
             doc.close()
         elif file_path.endswith(SUPPORTED_IMG_EXT):
-            images.append(Image.open(path).convert("RGB"))
+            # For single images, the page limit is effectively 1 if ocr_max_pages >= 1
+            if settings.data.ocr_max_pages > 0:
+                images.append(Image.open(path).convert("RGB"))
+                logger.info(f"Processing single image file as ocr_max_pages ({settings.data.ocr_max_pages}) >= 1.")
+            else:
+                logger.info(f"Skipping single image file as ocr_max_pages is {settings.data.ocr_max_pages}.")
         else:
             # Unsupported file type for OCR
             return ""

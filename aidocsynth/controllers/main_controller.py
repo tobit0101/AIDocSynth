@@ -37,6 +37,7 @@ class MainController(QObject):
         self.active_jobs = 0
         self.workers = set()
         self.file_manager = FileManager(self.config_manager.data)
+        self._cancellation_requested = False
 
         # Initialize working directory label in the view
         if self.view and hasattr(self.view, 'update_workdir_label'):
@@ -48,6 +49,9 @@ class MainController(QObject):
         if hasattr(self.config_manager, 'settings_changed'):
             self.config_manager.settings_changed.connect(self._handle_settings_changed)
 
+        # Set initial thread pool size based on settings
+        self._update_thread_pool_size()
+
     def close(self):
         """Shuts down the process pool gracefully on application exit."""
         self.logger.info("Shutting down process pool...")
@@ -58,23 +62,49 @@ class MainController(QObject):
         if not paths:
             return
 
+        # Reset cancellation flag and enable stop button if jobs are starting
+        if paths:
+            self._cancellation_requested = False
+            if self.view and hasattr(self.view, 'actionStopProcessing'):
+                self.view.actionStopProcessing.setEnabled(True)
+
         self.active_jobs += len(paths)
         self.logger.info(f"Received drop: {paths}, active jobs now: {self.active_jobs}")
         # Inform UI about total number of active jobs
         self._emit_processing_status()
         for p in paths:
+            if self._cancellation_requested:
+                self.logger.info("Cancellation requested, skipping remaining files in this batch.")
+                # Adjust active_jobs count for the skipped files.
+                try:
+                    current_index = paths.index(p) # Get the index of the current path
+                    skipped_count = len(paths) - current_index
+                    self.active_jobs -= skipped_count
+                    self.logger.info(f"Skipped {skipped_count} files due to cancellation. Active jobs now: {self.active_jobs}")
+                    if self.active_jobs <= 0: # Use <= 0 for safety
+                        self.active_jobs = 0 # Ensure it's not negative
+                        self.ocr_status_changed.emit("Bereit")
+                        if self.view and hasattr(self.view, 'actionStopProcessing'):
+                            self.view.actionStopProcessing.setEnabled(False)
+                        # self._cancellation_requested is already True and will be reset if a new batch starts or all jobs truly finish
+                    else:
+                        self._emit_processing_status() # Update status with new active_jobs count
+                except ValueError:
+                    # This should ideally not happen if p is from paths list
+                    self.logger.warning(f"Path {p} not found in paths list during cancellation handling.")
+                break # Exit the loop, stop processing further files from this batch
+            
             job = Job(path=p)
             self.jobAdded.emit(job)
             worker = Worker(self._pipeline, job)
 
             # --- Robust Signal Handling ---
-            # result: carries the completed job object on success
-            # error: carries the exception on failure
-            # finished: always emitted, used for cleanup
             worker.sig.result.connect(self.update_job_on_success)
             worker.sig.error.connect(partial(self.update_job_on_error, job))
             worker.sig.finished.connect(lambda _, w=worker: self._cleanup_after_worker(w))
 
+            # The QThreadPool will manage serial vs parallel execution based on its maxThreadCount.
+            self.logger.info(f"Queueing job for {p} for processing.")
             self.workers.add(worker)
             self.pool.start(worker)
 
@@ -88,10 +118,17 @@ class MainController(QObject):
             self.jobUpdated.emit(job)
 
     def update_job_on_error(self, job, error):
-        """Handles worker failure."""
-        self.logger.error(f"Pipeline for job {job.path} failed.", exc_info=True)
-        job.status = "error"
-        self.jobUpdated.emit(job)
+        """Handles worker failure, including cancellation."""
+        if isinstance(error, asyncio.CancelledError):
+            self.logger.info(f"Job {job.path} was cancelled by user request.")
+            if job.status != "cancelled": # Should have been set prior, but ensure
+                job.status = "cancelled"
+                self.jobUpdated.emit(job)
+            # No further error logging needed as this is an expected outcome
+        else:
+            self.logger.error(f"Pipeline for job {job.path} failed.", exc_info=error)
+            job.status = "error"
+            self.jobUpdated.emit(job)
 
     def _cleanup_after_worker(self, worker):
         """Removes worker from the active set and decrements job counter."""
@@ -105,11 +142,19 @@ class MainController(QObject):
         self.logger.info(f"Job beendet, {self.active_jobs} aktive Jobs übrig")
         if self.active_jobs == 0:
             self.ocr_status_changed.emit("Bereit")
+            if self.view and hasattr(self.view, 'actionStopProcessing'):
+                self.view.actionStopProcessing.setEnabled(False)
+            self._cancellation_requested = False # Reset for next batch
         else:
             # Update the UI with remaining job count
             self._emit_processing_status()
 
     async def _update_job_progress(self, job, progress, status_message, log_message_prefix=""):
+        if self._cancellation_requested:
+            self.logger.info(f"Cancellation detected in _update_job_progress for job {job.path}. Raising CancelledError.")
+            job.status = "cancelled"
+            self.jobUpdated.emit(job)
+            raise asyncio.CancelledError(f"Processing cancelled by user for job {job.path}.")
         job.progress = progress
         job.status = status_message
         self.jobUpdated.emit(job)
@@ -133,7 +178,11 @@ class MainController(QObject):
         return text
 
     async def _classify_document(self, job, text_content, src_path):
-        await self._update_job_progress(job, 70, "classifying", "3/6")
+        if self._cancellation_requested:
+            self.logger.info(f"Cancellation requested before starting classification for {job.path}.")
+            raise asyncio.CancelledError(f"Classification for {job.path} cancelled by user request.")
+        
+        await self._update_job_progress(job, 70, "classifying", "3/6") # This also checks cancellation
         llm_provider = None
         try:
             llm_provider = get_provider(self.config_manager.data.llm)
@@ -150,7 +199,8 @@ class MainController(QObject):
                 text_content=text_content,
                 file_path=job.path,
                 metadata=original_metadata,
-                directory_structure=directory_structure
+                directory_structure=directory_structure,
+                is_cancelled_callback=lambda: self._cancellation_requested
             )
 
             src_name = Path(job.path).name
@@ -182,8 +232,38 @@ class MainController(QObject):
             original_metadata
         )
 
+    @Slot()
+    def request_cancellation(self):
+        """Requests cancellation of ongoing and pending processing tasks."""
+        self.logger.info("Cancellation requested by user.")
+        self.ocr_status_changed.emit("Stoppen...") # Update status immediately
+        self._cancellation_requested = True
+        if self.view and hasattr(self.view, 'actionStopProcessing'):
+            self.view.actionStopProcessing.setEnabled(False) # Disable button once clicked
+
+        # For QThreadPool, we can't directly cancel QRunnables that are already running.
+        # The pipeline itself will need to check self._cancellation_requested.
+        # We can, however, try to clear pending tasks if QThreadPool supports it (it doesn't directly).
+        # self.pool.clear() # This method doesn't exist on QThreadPool
+        # self.pool.waitForDone(100) # Attempt to let current finish quickly, then rely on flag
+
+        # For ProcessPoolExecutor, futures can be cancelled if not yet running.
+        # However, our tasks are submitted one by one inside the async pipeline steps.
+        # The primary mechanism will be the _pipeline checking the flag.
+
+        # If in serial mode and a worker.run() is blocking, this flag will be checked by the next iteration
+        # or by the pipeline steps of the currently running serial task.
+
     async def _pipeline(self, job):
         """The main processing pipeline for a single file."""
+        if self._cancellation_requested:
+            self.logger.info(f"Pipeline for job {job.path} cancelled before starting.")
+            job.status = "cancelled"
+            job.progress = 0 # Or current progress if preferred for cancelled state
+            self.jobUpdated.emit(job)
+            # Ensure this is handled by the worker's error path to decrement active_jobs
+            raise asyncio.CancelledError(f"Processing cancelled by user before pipeline start for {job.path}.")
+
         src_path = Path(job.path)
 
         try:
@@ -199,9 +279,20 @@ class MainController(QObject):
             await self._update_job_progress(job, 100, "completed", "6/6")
             return job
 
+        except asyncio.CancelledError as e:
+            self.logger.info(f"Pipeline for {src_path.name} was cancelled: {e}")
+            # Job status should have been set to 'cancelled' by _update_job_progress or pipeline start check
+            # Ensure update_job_on_error or a similar mechanism handles this for cleanup if not already done
+            # For now, assuming the job status is already 'cancelled' and sig.error will be emitted by worker.
+            # We might need a specific slot for cancellation if different UI update is needed.
+            # Re-raise to ensure worker's error path is taken for cleanup.
+            if job.status != "cancelled": # If not already set by our checks
+                job.status = "cancelled"
+                self.jobUpdated.emit(job)
+            raise # Important to re-raise for Worker's error handling
         except Exception as e:
             self.logger.error(f"Pipeline failed for {src_path.name}: {e}", exc_info=True)
-            self.update_job_on_error(job, str(e))
+            self.update_job_on_error(job, str(e)) # This will set job.status = "error"
 
     def show_about_dialog(self):
         """
@@ -247,6 +338,21 @@ class MainController(QObject):
                 self._current_work_dir_display = new_work_dir
         else:
             self.logger.debug("Settings changed, but working directory remains the same.")
+
+        # Update thread pool size in case processing mode changed
+        self._update_thread_pool_size()
+
+    def _update_thread_pool_size(self):
+        """Sets the max thread count on the global QThreadPool based on the processing mode setting."""
+        if settings.data.processing_mode == "serial":
+            self.pool.setMaxThreadCount(1)
+            self.logger.info("Set QThreadPool max threads to 1 for serial processing.")
+        else:  # Parallel processing
+            # Set to a reasonable number of threads for parallel processing.
+            # os.cpu_count() is a good default.
+            max_threads = os.cpu_count()
+            self.pool.setMaxThreadCount(max_threads)
+            self.logger.info(f"Set QThreadPool max threads to {max_threads} for parallel processing.")
 
     # ------------------------------------------------------------------
     # Helper Methods

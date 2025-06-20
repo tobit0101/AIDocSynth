@@ -27,8 +27,10 @@ class AppSettings(BaseModel):
     work_dir: Path = Field(default_factory=_default_work_dir)
     backup_root: Path | None = None
     unsorted_root: Path | None = None
+    ocr_max_pages: int = 5  # Maximum number of pages to OCR
     create_backup: bool = True
     sort_action: str = "copy"        # copy | move
+    processing_mode: str = "parallel"  # parallel | serial
     llm: LLMSettings = Field(default_factory=LLMSettings)
 
     model_config = {"extra": "forbid"}            # Fehlertyp statt stilles Ignorieren

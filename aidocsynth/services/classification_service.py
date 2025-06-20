@@ -24,7 +24,8 @@ class ClassificationService:
         text_content: str, 
         file_path: str, 
         metadata: Dict[str, Any] = None, # Placeholder for now
-        directory_structure: List[str] = None # Placeholder for now
+        directory_structure: List[str] = None, # Placeholder for now
+        is_cancelled_callback: callable = None
     ) -> Dict[str, Any]:
         """
         Classifies the document using the configured LLM provider and prompts.
@@ -66,10 +67,14 @@ class ClassificationService:
         # the mandatory keys: "target_filename" and "target_directory".
         last_error: Exception | None = None
         for attempt in range(1, self.max_retries + 1):
+            if is_cancelled_callback and is_cancelled_callback():
+                self.logger.info(f"Cancellation requested before attempt {attempt} for {Path(file_path).name}. Aborting classification.")
+                raise asyncio.CancelledError("Classification cancelled by user request during retry loop.")
             try:
                 raw_response = await self.llm_provider.classify_document(
                     system_prompt=system_prompt,
-                    user_prompt=user_prompt
+                    user_prompt=user_prompt,
+                    is_cancelled_callback=is_cancelled_callback
                 )
 
                 # The provider may already return a dict or a JSON string. Try both.
@@ -79,11 +84,8 @@ class ClassificationService:
                     classification_data = json.loads(str(raw_response))
 
                 # Validate minimal schema
-                if not (
-                    isinstance(classification_data, dict)
-                    and "target_filename" in classification_data
-                    and "target_directory" in classification_data
-                ):
+                if not (isinstance(classification_data, dict) and "target_filename" in classification_data and "target_directory" in classification_data):
+                    self.logger.warning(f"Invalid classification result for {target_filename_string}:\n{classification_data}")
                     raise ValueError(
                         "Invalid classification result – missing required keys 'target_filename' and/or 'target_directory'."
                     )

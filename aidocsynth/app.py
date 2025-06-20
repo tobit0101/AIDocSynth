@@ -81,7 +81,22 @@ def load_main_application(splash):
     
     pool.start(worker)
 
-def main():
+def setup_logging(level="INFO"):
+    """
+    Configures the root logger.
+    """
+    log_level = getattr(logging, level.upper(), logging.INFO)
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s - %(levelname)s - [%(name)s:%(lineno)d] - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    logger = logging.getLogger("AIDocSynth")
+    logger.info(f"Logging initialized with level {level}")
+    return logger
+
+
+def main(loglevel="INFO"):
     """
     Main entry point: sets up the app, shows the main window immediately,
     and defers other initializations.
@@ -96,12 +111,7 @@ def main():
     app.setQuitOnLastWindowClosed(False)
 
     # Setup basic logging early
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - [%(name)s:%(lineno)d] - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    logger = logging.getLogger("AIDocSynth")
+    logger = setup_logging(level=loglevel)
     logger.info("Application starting...")
 
     # Ensure that the application quits when Ctrl+C is pressed.

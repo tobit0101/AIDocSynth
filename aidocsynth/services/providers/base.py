@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Tuple
+from typing import List, Callable, Tuple
 from jinja2 import Environment, PackageLoader, FileSystemLoader, select_autoescape
 import sys
 import os
@@ -79,12 +79,12 @@ class ProviderBase(ABC):
         template = self._PROMPT_ENV.get_template(name)
         return template.render(**kw)
 
-    async def classify_document(self, system_prompt: str, user_prompt: str):
+    async def classify_document(self, system_prompt: str, user_prompt: str, is_cancelled_callback: Callable[[], bool] = None):
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
+            {"role": "user", "content": user_prompt},
         ]
-        response_text = await self._run(messages)
+        response_text = await self._run(messages, is_cancelled_callback=is_cancelled_callback)
         # Clean the response: remove markdown code fences and strip whitespace
         match = re.search(r"```(json)?(.*)```", response_text, re.DOTALL)
         if match:
@@ -102,4 +102,5 @@ class ProviderBase(ABC):
             raise # Re-raise the exception to be handled by the caller
 
     @abstractmethod
-    async def _run(self, messages: list): ...
+    async def _run(self, messages: list, is_cancelled_callback: Callable[[], bool] = None):
+        pass

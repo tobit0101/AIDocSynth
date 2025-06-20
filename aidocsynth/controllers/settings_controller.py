@@ -48,6 +48,8 @@ class SettingsController(QObject):
         self.v.editUnsortedRoot.setText(str(s.unsorted_root))
         self.v.chkCreateBackup.setChecked(s.create_backup)
         self.v.cmbBackupAction.setCurrentText("Kopieren" if s.sort_action=="copy" else "Verschieben")
+        self.v.cmbProcessingMode.setCurrentText("Parallel" if s.processing_mode=="parallel" else "Seriell")
+        self.v.spinOcrMaxPages.setValue(s.ocr_max_pages)
 
         self.v.cmbProvider.setCurrentText(llm.provider)
         self.v.editOpenAIKey.setText(llm.openai_api_key or "")
@@ -68,6 +70,8 @@ class SettingsController(QObject):
         s.unsorted_root = Path(self.v.editUnsortedRoot.text())
         s.create_backup = self.v.chkCreateBackup.isChecked()
         s.sort_action   = "copy" if self.v.cmbBackupAction.currentText()=="Kopieren" else "move"
+        s.processing_mode = "parallel" if self.v.cmbProcessingMode.currentText()=="Parallel" else "serial"
+        s.ocr_max_pages = self.v.spinOcrMaxPages.value()
 
         llm.provider        = self.v.cmbProvider.currentText()
         llm.openai_api_key  = self.v.editOpenAIKey.text().strip() or None

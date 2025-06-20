@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QDialog, QVBoxLayout, QLineEdit, QComboBox, 
     QDialogButtonBox, QGroupBox, QWidget, QStackedWidget, QLabel,
-    QPushButton, QHBoxLayout, QCheckBox, QFormLayout
+    QPushButton, QHBoxLayout, QCheckBox, QFormLayout, QSpinBox
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
@@ -83,6 +83,20 @@ class SettingsDialogView(QDialog):
         self.cmbBackupAction.setObjectName("cmbBackupAction")
         self.cmbBackupAction.addItems(["Kopieren", "Verschieben"])
         allgemein_layout.addRow("Aktion für Originaldatei:", self.cmbBackupAction)
+
+        # Processing Mode Dropdown
+        self.cmbProcessingMode = QComboBox()
+        self.cmbProcessingMode.setObjectName("cmbProcessingMode")
+        self.cmbProcessingMode.addItems(["Parallel", "Seriell"])
+        allgemein_layout.addRow("Verarbeitungsmodus:", self.cmbProcessingMode)
+
+        # OCR Max Pages
+        self.spinOcrMaxPages = QSpinBox()
+        self.spinOcrMaxPages.setObjectName("spinOcrMaxPages")
+        self.spinOcrMaxPages.setMinimum(1)
+        self.spinOcrMaxPages.setMaximum(100) # Or a higher sensible limit
+        # Default value will be set by the controller during load
+        allgemein_layout.addRow("Maximale OCR-Seiten:", self.spinOcrMaxPages)
 
         allgemein_group_box.setLayout(allgemein_layout)
         self.layout.addWidget(allgemein_group_box)

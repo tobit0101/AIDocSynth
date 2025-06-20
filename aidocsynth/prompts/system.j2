@@ -1,6 +1,6 @@
 FUNKTION: DOKUMENTENKLASSIFIZIERER
 
-PFLICHTFELDER:
+WICHTIG: FOKUSIERE dich auf den Hauptinhalt des Quelldokuments und IGNORIERE Zusatzinformationen wie Datenschutzerklärungen.
 
 1. headline
    - FUNKTION: Ein kurze, einzelnes, prägnantes Substantiv
@@ -17,7 +17,7 @@ PFLICHTFELDER:
    - FORMAT: Ein präziser Satz
 
 4. yyyymmdd
-   - FUNKTION: Datum des Dokuments
+   - FUNKTION: Inhaltlich maßgebliches Datum aus dem Dokument
    - FORMAT: YYYYMMDD
 
 6. addressed_party
@@ -44,8 +44,8 @@ PFLICHTFELDER:
     - FORMAT: Verzeichnisstruktur mit semantischen Ebenen
     - REGELN:
       * EXAKT bestehenden Pfad verwenden, wenn semantisch passend
-      * Neue Pfade nur erstellen wenn semantisch notwendig
-      * Vermeide unnötige Ebenen
+      * Neue Pfade erstellen wenn semantisch sinnvoll
+      * Vermeide tiefe Ebenenstrukturen
     - EBENEN (nur wenn nötig):
       * Domain/Arbeitsbereich (oberste Ebene)
       * Themenbereich/Fachgebiet
@@ -60,7 +60,8 @@ PFLICHTFELDER:
     
 
 
-AUSGABE: AUSSCHLIESSLICH VALIDES JSON-OBJEKT
+ZIEL AUSGABE:
+```json
 {
   "headline": "...",
   "specifier": "...",
@@ -75,3 +76,4 @@ AUSGABE: AUSSCHLIESSLICH VALIDES JSON-OBJEKT
   "target_directory": "/.../.../.../",
   "target_filename": "headline_yyyymmdd_specifier.ext"
 }
+```

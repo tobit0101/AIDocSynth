@@ -105,6 +105,7 @@ class MainWindowView(QMainWindow):
         # Set the main window title, this comment is to force re-compilation
         self.setWindowTitle(QCoreApplication.translate("MainWindow", "AIDocSynth", None))
         self.actionOpenWorkdir.setText(QCoreApplication.translate("MainWindow", "&Arbeitsverzeichnis öffnen...", None))
+        self.actionStopProcessing.setText(QCoreApplication.translate("MainWindow", "Prozess &stoppen", None))
         self.workdir_label.setToolTip(QCoreApplication.translate("MainWindow", "Klicken, um das Arbeitsverzeichnis zu öffnen", None))
 
     def _create_actions(self):
@@ -119,11 +120,14 @@ class MainWindowView(QMainWindow):
         self.actionAbout = QAction(f"Über {QApplication.applicationName()}", self)
         self.actionShowMainWindow = QAction(QCoreApplication.translate("MainWindow", "&Hauptfenster anzeigen", None), self)
         self.actionOpenWorkdir = QAction("&Arbeitsverzeichnis öffnen...", self)
+        self.actionStopProcessing = QAction("Prozess &stoppen", self)
+        self.actionStopProcessing.setEnabled(False) # Initially disabled
 
     def _create_menus(self):
         """Create the application's menu bar."""
         file_menu = self.menubar.addMenu("&Datei")
         file_menu.addAction(self.actionSettings)
+        file_menu.addAction(self.actionStopProcessing)
         file_menu.addSeparator()
         file_menu.addAction(self.actionExit)
         view_menu = self.menubar.addMenu("&Ansicht")
@@ -143,6 +147,7 @@ class MainWindowView(QMainWindow):
         self.actionShowMainWindow.triggered.connect(self.show_and_raise)
         self.actionOpenWorkdir.triggered.connect(self._handle_open_workdir_request)
         self.workdir_label.mousePressEvent = self._handle_open_workdir_request
+        # self.actionStopProcessing will be connected in connect_controller_signals
 
     def connect_controller_signals(self):
         """Connect signals that depend on the controller. Call after controller is set."""
@@ -153,6 +158,7 @@ class MainWindowView(QMainWindow):
         self.active_drop_area.filesDropped.connect(self.controller.handle_drop)
         self.controller.ocr_status_changed.connect(self.update_ocr_status)
         self.controller.jobUpdated.connect(self.status_dock.update_job_progress)
+        self.actionStopProcessing.triggered.connect(self.controller.request_cancellation) # Connect stop action
 
     @Slot(str)
     def update_ocr_status(self, message):

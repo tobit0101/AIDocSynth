@@ -39,10 +39,13 @@ class Worker(QRunnable):
             else:
                 # For sync functions, run them directly
                 result = self.fn(*self.args, **self.kwargs)
-        except Exception as e:
-            logging.exception("Error in worker thread")
+        except BaseException as e: # Catch BaseException to include asyncio.CancelledError
+            if isinstance(e, asyncio.CancelledError):
+                logging.info(f"Worker task cancelled: {self.fn.__name__}")
+            else:
+                logging.exception("Error in worker thread")
             try:
-                self.sig.error.emit(e)
+                self.sig.error.emit(e) # Emit the error, MainController will handle CancelledError specifically
             except RuntimeError:
                 pass  # Signal source might be deleted
         else:
