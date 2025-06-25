@@ -149,18 +149,21 @@ class MainController(QObject):
             # Update the UI with remaining job count
             self._emit_processing_status()
 
-    async def _update_job_progress(self, job, progress, status_message, log_message_prefix=""):
+    async def _update_job_progress(self, job, progress, status, log_message_prefix="", result=None):
+        """Helper to update job progress and emit signals."""
         if self._cancellation_requested:
-            self.logger.info(f"Cancellation detected in _update_job_progress for job {job.path}. Raising CancelledError.")
+            self.logger.info(f"Cancellation requested, setting job {job.path} to 'cancelled'")
             job.status = "cancelled"
             self.jobUpdated.emit(job)
-            raise asyncio.CancelledError(f"Processing cancelled by user for job {job.path}.")
+            raise asyncio.CancelledError(f"Processing cancelled by user for {job.path}.")
+
         job.progress = progress
-        job.status = status_message
+        job.status = status
+        if result is not None:
+            job.result = result
         self.jobUpdated.emit(job)
         if log_message_prefix:
-            src_name = Path(job.path).name
-            self.logger.info(f"[{src_name}] {log_message_prefix}: {status_message}...")
+            self.logger.info(f"[{Path(job.path).name}] {log_message_prefix}: {status}...")
 
     async def _backup_file(self, job, src_path):
         await self._update_job_progress(job, 10, "backing up", "1/5")
@@ -276,7 +279,8 @@ class MainController(QObject):
             if new_path:
                 await self._generate_and_write_metadata(job, new_path, classification_data, original_metadata)
 
-            await self._update_job_progress(job, 100, "completed", "6/6")
+            # Pass the new path to the final status update so it can be displayed in the UI
+            await self._update_job_progress(job, 100, "done", "6/6", result=str(new_path) if new_path else "")
             return job
 
         except asyncio.CancelledError as e:

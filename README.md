@@ -117,7 +117,7 @@ AIDocSynth/
 ## Roadmap
 
 * [x] **MVP** mit OpenAI‑Workflow & Basis‑GUI
-* [ ] Job History mit Aktiv/Abgeschlossen Prozessen
+* [x] Job History mit Aktiv/Abgeschlossen Prozessen
 * [ ] Wizard für Ersteinrichtung (API‑Keys, Ordnerwahl)
 * [ ] Automatische Überwachung eines »Eingang«‑Ordners
 * [ ] Mehrsprachige UI (i18n)

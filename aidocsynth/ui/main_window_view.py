@@ -10,6 +10,7 @@ from PySide6.QtGui import QDesktopServices
 from .drop_area import InactiveView, ActiveDropArea
 from .status_dock_view import StatusDockView
 from .settings_dialog_view import SettingsDialogView
+from aidocsynth.controllers.status_dock_controller import StatusDockController
 
 class MainWindowView(QMainWindow):
     """
@@ -24,6 +25,7 @@ class MainWindowView(QMainWindow):
         self._setup_ui()
         self._create_actions()
         self._create_menus()
+        self._create_controllers()
         self._retranslate_ui() # Call after actions and menus are created
         self._connect_local_signals() # Connect signals not dependent on controller
 
@@ -123,6 +125,10 @@ class MainWindowView(QMainWindow):
         self.actionStopProcessing = QAction("Prozess &stoppen", self)
         self.actionStopProcessing.setEnabled(False) # Initially disabled
 
+    def _create_controllers(self):
+        """Create controllers for UI components."""
+        self.status_dock_controller = StatusDockController(self.status_dock, self)
+
     def _create_menus(self):
         """Create the application's menu bar."""
         file_menu = self.menubar.addMenu("&Datei")
@@ -157,7 +163,10 @@ class MainWindowView(QMainWindow):
         self.actionAbout.triggered.connect(self.controller.show_about_dialog)
         self.active_drop_area.filesDropped.connect(self.controller.handle_drop)
         self.controller.ocr_status_changed.connect(self.update_ocr_status)
-        self.controller.jobUpdated.connect(self.status_dock.update_job_progress)
+        # Connect job signals to the status dock controller
+        self.controller.jobAdded.connect(self.status_dock_controller.add_job)
+        self.controller.jobUpdated.connect(self.status_dock_controller.refresh_job)
+
         self.actionStopProcessing.triggered.connect(self.controller.request_cancellation) # Connect stop action
 
     @Slot(str)
