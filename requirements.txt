@@ -4,7 +4,10 @@ PySide6-Addons
 PySide6-Essentials
 
 # OCR and Document Processing
-python-doctr[torch]
+python-doctr
+torch==2.3.0
+torchvision==0.18.0
+torchaudio==2.3.0
 PyMuPDF
 Pillow
 piexif

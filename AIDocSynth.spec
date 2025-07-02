@@ -10,11 +10,12 @@ dev = os.getenv("PYI_MODE", "release") == "dev"
 
 # --- Data Collection Helpers ---
 pyside_plugins = collect_data_files("PySide6", subdir="plugins", include_py_files=False)
+
 a = Analysis(
     ['run.py'],
     pathex=[],
     # --- Qt / PySide6 Plugins & Shiboken --- 
-    binaries=collect_dynamic_libs("PySide6") + collect_dynamic_libs("shiboken6"),
+    binaries=collect_dynamic_libs("PySide6") + collect_dynamic_libs("shiboken6") + collect_dynamic_libs("torchvision"),
     # --- Data Files ---
     datas=pyside_plugins + [
         ('aidocsynth/ui/resources', 'aidocsynth/ui/resources'),
@@ -22,6 +23,7 @@ a = Analysis(
     ],
     # --- Hidden Imports ---
     hiddenimports=[
+        'scipy._cyutility',
         'PySide6.QtSvg',
         'PySide6.QtNetwork',
         'openai',
