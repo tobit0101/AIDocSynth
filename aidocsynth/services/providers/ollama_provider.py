@@ -11,6 +11,12 @@ logger = logging.getLogger(__name__)
 class OllamaProvider(ProviderBase):
     name = "ollama"
 
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.close()
+
     async def get_models(self, **kwargs) -> List[str]:
         """
         Fetches the list of available models from the Ollama host configured in this provider instance.

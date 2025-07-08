@@ -113,11 +113,18 @@ class SettingsController(QObject):
     def _load_models(self, provider: str):
         log.info(f"Lazy loading models for provider: {provider}")
         cfg = self._collect_temp_cfg()
-        prov_cls = providers.get_provider(cfg).__class__
-        log.debug(f"Using provider class '{prov_cls.__name__}' for model loading.")
-        worker = fetch_models_async(prov_cls, cfg)
-        worker.sig.result.connect(lambda models: self.modelsReady.emit(provider, models))
-        self._pool.start(worker)
+        try:
+            # Run the async fetcher directly in the main thread. This is a very
+            # fast operation (single HTTP call) and avoids the segmentation
+            # fault caused by asyncio/threading issues with QThreadPool.
+            prov_cls = providers.get_provider(cfg).__class__
+            worker = fetch_models_async(prov_cls, cfg)
+            # The worker's fn is an async function, we can run it with asyncio.run
+            models = asyncio.run(worker.fn())
+            self.modelsReady.emit(provider, models)
+        except Exception as e:
+            log.error(f"Failed to load models for {provider}: {e}", exc_info=True)
+            self.modelsReady.emit(provider, []) # Emit empty list on error
 
     def _populate_models(self, provider: str, models: list[str]):
         log.info(f"Populating model list for '{provider}' with {len(models)} models.")
