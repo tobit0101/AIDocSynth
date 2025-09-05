@@ -60,6 +60,8 @@ A readable map of what each test covers and how it maps to application code. Thi
     - `test_pipeline_and_table_update` → End-to-End mit Stubs für `full_text`, `FileManager`, `MetadataService`; prüft `jobAdded`/`jobUpdated`, `JobTableModel`
   - `tests/feature/test_pipeline_ocr.py`
     - `test_pipeline_with_assets` → echte Dateien, `full_text` stubbed; prüft Backup-Kopie, Sortierung ins Ziel (Copy-Flow)
+  - `tests/qt/test_cancel_during_processing.py`
+    - Erzwingt Cancel während der Klassifikationsphase (pollt `is_cancelled_callback`), triggert `request_cancellation()` sobald Status `classifying` emittiert wurde. Prüft: kein Crash, Status `cancelled`, nie `done`, UI-Reset (Stop disabled, "Bereit"). Stabil via Signal-Synchronisation.
 
 - Slots/Signale/Fehlerpfade
   - `tests/qt/test_controller_edge_cases.py`
@@ -135,6 +137,11 @@ A readable map of what each test covers and how it maps to application code. Thi
   - Fehlerfälle: `CancelledError` behandelt, `RuntimeError` beim Emit unterdrückt
   - Kein `QCoreApplication` → keine Thread-Verschiebung, läuft dennoch
 
+- `tests/qt/test_parallel_processing.py`
+  - Real-nahe Parallelität: `MainController` unter `processing_mode=parallel` mit 2 Threads
+  - Zwei Jobs gleichzeitig droppen, klassifikations-Stufe instrumentiert (simulierte Latenz)
+  - Prüft zeitliche Überlappung (Konkurrenz) sowie vollständigen Abschluss und Outputs
+
 ### `aidocsynth/utils/async_worker.py`
 
 - Direkte Tests entfernt (thin wrapper: `fetch_models_async`)
@@ -208,6 +215,15 @@ A readable map of what each test covers and how it maps to application code. Thi
 
 - `tests/qt/test_worker.py`
   - `utils.worker.Worker.run()` Signal-Pfade, Sync/Async, Fehlerfälle
+
+- `tests/qt/test_parallel_processing.py`
+  - `controllers.main_controller._update_thread_pool_size()` (indirekt: parallel vs. serial)
+  - `controllers.main_controller.handle_drop()` Queueing mehrerer Jobs, Worker-Start, Cleanup
+  - `services.classification_service.ClassificationService.classify_document()` (instrumentiert für Latenz/Overlap)
+  - `services.file_manager.process_document()` realer Copy-Flow (kein Netzwerk)
+
+- `tests/qt/test_cancel_during_processing.py`
+  - Forcierter Cancel zur Laufzeit in der Klassifikationsphase; verifiziert robustes Fehler-/Cancel-Handling ohne Absturz, sauberes Cleanup und UI-Reset.
 
 ---
 
