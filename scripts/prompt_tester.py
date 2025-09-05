@@ -1,8 +1,9 @@
 """
 # Test Script for Ollama Prompts
 
-This script allows for rapid testing of different prompt combinations (system, analysis)
-with various text files against a specified Ollama model.
+This script allows rapid testing of different prompt combinations (system, analysis)
+with various text files against a specified Ollama model. By default it uses the
+application prompts shipped in `aidocsynth/prompts/`.
 
 ## Prerequisites
 - Python 3.x
@@ -12,20 +13,20 @@ with various text files against a specified Ollama model.
 
 The script is run from the command line from the root of the project directory.
 
-### Example 1: Basic test with analysis prompt and text file
+### Example 1: Basic test with app prompts and a text file
 
 ```bash
-python tests/test_prompt.py
+python scripts/prompt_tester.py --text path/to/sample.txt
 ```
 
-### Example 2: Full test with system prompt, analysis prompt, text file, and specific model
+### Example 2: Override prompts and specify model
 
 ```bash
-python tests/test_prompt.py \\
-    --system tests/prompts/system.j2 \\
-    --analysis tests/prompts/analysis.j2 \\
-    --text tests/prompts/document.txt \\
-    --context tests/prompts/context.json \\
+python scripts/prompt_tester.py \
+    --system path/to/custom/system.j2 \
+    --analysis path/to/custom/analysis.j2 \
+    --text path/to/sample.txt \
+    --context path/to/context.json \
     --model llama3.1:8b-instruct-q8_0
 ```
 """
@@ -35,34 +36,50 @@ import ollama
 import sys
 import json
 from pathlib import Path
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, PackageLoader, select_autoescape
 
-async def run_prompt_test(system_prompt_path: Path, analysis_prompt_path: Path, text_file_path: Path, context_path: Path, model: str):
+async def run_prompt_test(system_prompt_path: Path | None, analysis_prompt_path: Path | None, text_file_path: Path | None, context_path: Path | None, model: str):
     """
     Runs a test against the Ollama API with the given prompts and text file.
     """
     try:
-        # 1. Setup Jinja2 environment
-        env = Environment(loader=FileSystemLoader(searchpath="."))
+        # 1. Setup Jinja2 environments
+        #    - Package prompts (default): aidocsynth/prompts/system.j2 & analysis.j2
+        #    - Filesystem prompts (optional overrides): if paths provided via CLI
+        pkg_env = Environment(
+            loader=PackageLoader("aidocsynth", "prompts"),
+            autoescape=select_autoescape()
+        )
+        fs_env = Environment(loader=FileSystemLoader(searchpath="."))
 
-        # 2. Load context data from files
-        with context_path.open('r', encoding='utf-8') as f:
-            context = json.load(f)
+        # 2. Load context data from file if provided, else use minimal defaults
+        context: dict = {}
+        if context_path:
+            with context_path.open('r', encoding='utf-8') as f:
+                context = json.load(f)
 
         # Handle multi-line directory structure if it's a list
         if 'directory_structure' in context and isinstance(context.get('directory_structure'), list):
             context['directory_structure'] = '\n'.join(context['directory_structure'])
         
+        if not text_file_path:
+            print("Error: --text is required (path to a text payload to classify)", file=sys.stderr)
+            return
         text_content = text_file_path.read_text(encoding='utf-8')
         context['content'] = text_content
 
         # 3. Render prompts
-        system_prompt = ""
+        # 3. Render prompts (package defaults, filesystem overrides if provided)
         if system_prompt_path:
-            system_template = env.get_template(str(system_prompt_path))
-            system_prompt = system_template.render(context)
-        
-        analysis_template = env.get_template(str(analysis_prompt_path))
+            system_template = fs_env.get_template(str(system_prompt_path))
+        else:
+            system_template = pkg_env.get_template("system.j2")
+        if analysis_prompt_path:
+            analysis_template = fs_env.get_template(str(analysis_prompt_path))
+        else:
+            analysis_template = pkg_env.get_template("analysis.j2")
+
+        system_prompt = system_template.render(context)
         analysis_prompt = analysis_template.render(context)
 
         # 3. Setup Ollama client
@@ -82,8 +99,13 @@ async def run_prompt_test(system_prompt_path: Path, analysis_prompt_path: Path, 
         
         print(f"--- Running test with model: {model} ---")
         if system_prompt_path:
-            print(f"--- System Prompt: {system_prompt_path.name} ---")
-        print(f"--- Analysis Prompt: {analysis_prompt_path.name} ---")
+            print(f"--- System Prompt (override): {system_prompt_path.name} ---")
+        else:
+            print("--- System Prompt: aidocsynth/prompts/system.j2 ---")
+        if analysis_prompt_path:
+            print(f"--- Analysis Prompt (override): {analysis_prompt_path.name} ---")
+        else:
+            print("--- Analysis Prompt: aidocsynth/prompts/analysis.j2 ---")
         print(f"--- Text File: {text_file_path.name} ---\n")
 
         # 6. Call Ollama API
@@ -119,26 +141,26 @@ async def main():
     parser.add_argument(
         "--system",
         type=Path,
-        default="tests/prompts/system.j2",
-        help="Path to the system prompt file (default: tests/prompts/system.j2)."
+        default=None,
+        help="Optional path to a custom system prompt file. Defaults to aidocsynth/prompts/system.j2."
     )
     parser.add_argument(
         "--analysis",
         type=Path,
-        default="tests/prompts/analysis.j2",
-        help="Path to the analysis prompt file (default: tests/prompts/analysis.j2)."
+        default=None,
+        help="Optional path to a custom analysis prompt file. Defaults to aidocsynth/prompts/analysis.j2."
     )
     parser.add_argument(
         "--text",
         type=Path,
-        default="tests/prompts/document.txt",
-        help="Path to the example text file (default: tests/prompts/document.txt)."
+        required=True,
+        help="Path to the example text file to classify."
     )
     parser.add_argument(
         "--context",
         type=Path,
-        default="tests/prompts/context.json",
-        help="Path to the context data JSON file (default: tests/prompts/context.json)."
+        default=None,
+        help="Optional path to a JSON context file (e.g., directory structure)."
     )
     parser.add_argument(
         "--model",

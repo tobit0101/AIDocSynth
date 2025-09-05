@@ -178,16 +178,29 @@ class FileManager:
                     f"[{src_name}] Harmonised file extension. Using '{src_suffix_lower}' -> '{target_filename}'."
                 )
 
-            # Strip leading slashes to treat paths like '/foo/bar' as relative
-            # if they are not truly absolute system paths.
-            cleaned_target_directory_str = target_directory_str.lstrip('/\\')
-            raw_target = Path(cleaned_target_directory_str)
+            # Interpret absolute paths as-is (but enforce workspace boundaries).
+            # For relative paths, also sanitize accidental leading slashes.
+            raw_target = Path(target_directory_str)
             # Relative paths are interpreted relative to the workspace, absolute
             # paths are validated to still be inside the workspace.
             if raw_target.is_absolute():
-                dst_dir = self._ensure_within_work_dir(raw_target)
+                try:
+                    dst_dir = self._ensure_within_work_dir(raw_target)
+                except ValueError:
+                    # If the model returned an absolute path that points outside the
+                    # workspace, interpret it as an accidental absolute and treat it
+                    # as a RELATIVE path within the workspace after stripping the
+                    # leading separators. This keeps security (still inside
+                    # workspace) while being robust to model outputs.
+                    cleaned_target_directory_str = target_directory_str.lstrip('/\\')
+                    logger.warning(
+                        f"[{src_name}] -> Target directory '{target_directory_str}' is outside workspace. "
+                        f"Interpreting as relative '{cleaned_target_directory_str}'."
+                    )
+                    dst_dir = self._ensure_within_work_dir(self.cfg.work_dir / Path(cleaned_target_directory_str))
             else:
-                dst_dir = self._ensure_within_work_dir(self.cfg.work_dir / raw_target)
+                cleaned_target_directory_str = target_directory_str.lstrip('/\\')
+                dst_dir = self._ensure_within_work_dir(self.cfg.work_dir / Path(cleaned_target_directory_str))
             
             action_verb = "Moving" if self.cfg.sort_action == "move" else "Copying"
             logger.info(f"[{src_name}] {action_verb} file to '{target_directory_str}' as '{target_filename}'...")

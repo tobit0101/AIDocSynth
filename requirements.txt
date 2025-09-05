@@ -29,8 +29,11 @@ pyobjc-framework-Cocoa; sys_platform == 'darwin'
 pytest
 pytest-mock
 pytest-qt
+pytest-asyncio
+pytest-cov
 
 typing_extensions
 urllib3
 ollama
 openai
+mistralai

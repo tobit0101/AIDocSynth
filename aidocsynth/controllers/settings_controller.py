@@ -23,6 +23,7 @@ class SettingsController(QObject):
         self.v.btnTestOpenAI.clicked .connect(lambda: self._test('openai'))
         self.v.btnTestAzure.clicked  .connect(lambda: self._test('azure'))
         self.v.btnTestOllama.clicked .connect(lambda: self._test('ollama'))
+        self.v.btnTestMistral.clicked.connect(lambda: self._test('mistral'))
         self.modelsReady.connect(self._populate_models)
         self.testDone.connect(self.v.show_test_result)
         self.testDone.connect(self._handle_successful_test)
@@ -33,6 +34,7 @@ class SettingsController(QObject):
         self.v.editAzureKey.textChanged.connect(self._update_test_button_states)
         self.v.editAzureApiVersion.textChanged.connect(self._update_test_button_states)
         self.v.editOllamaBaseUrl.textChanged.connect(self._update_test_button_states)
+        self.v.editMistralKey.textChanged.connect(self._update_test_button_states)
 
         self.load()
         self._update_test_button_states() # Set initial state
@@ -49,6 +51,7 @@ class SettingsController(QObject):
         self.v.chkCreateBackup.setChecked(s.create_backup)
         self.v.cmbBackupAction.setCurrentText("Kopieren" if s.sort_action=="copy" else "Verschieben")
         self.v.cmbProcessingMode.setCurrentText("Parallel" if s.processing_mode=="parallel" else "Seriell")
+        self.v.spinMaxParallel.setValue(s.max_parallel_processes)
         self.v.spinOcrMaxPages.setValue(s.ocr_max_pages)
 
         self.v.cmbProvider.setCurrentText(llm.provider)
@@ -60,6 +63,11 @@ class SettingsController(QObject):
         self.v.editAzureApiVersion   .setText(llm.azure_api_version)
         self.v.editOllamaBaseUrl     .setText(llm.ollama_host)
         self.v.cmbOllamaModel.setEditText(llm.ollama_model)
+        # Mistral
+        if hasattr(self.v, 'editMistralKey'):
+            self.v.editMistralKey.setText(llm.mistral_api_key or "")
+        if hasattr(self.v, 'cmbMistralModel'):
+            self.v.cmbMistralModel.setEditText(llm.mistral_model)
         self._switch_provider(llm.provider)
 
     def save(self):
@@ -71,6 +79,7 @@ class SettingsController(QObject):
         s.create_backup = self.v.chkCreateBackup.isChecked()
         s.sort_action   = "copy" if self.v.cmbBackupAction.currentText()=="Kopieren" else "move"
         s.processing_mode = "parallel" if self.v.cmbProcessingMode.currentText()=="Parallel" else "serial"
+        s.max_parallel_processes = self.v.spinMaxParallel.value()
         s.ocr_max_pages = self.v.spinOcrMaxPages.value()
 
         llm.provider        = self.v.cmbProvider.currentText()
@@ -82,6 +91,11 @@ class SettingsController(QObject):
         llm.azure_api_version = self.v.editAzureApiVersion.text().strip() or llm.azure_api_version
         llm.ollama_host     = self.v.editOllamaBaseUrl.text().strip()
         llm.ollama_model    = self.v.cmbOllamaModel.currentText().strip()
+        # Mistral
+        if hasattr(self.v, 'editMistralKey'):
+            llm.mistral_api_key = self.v.editMistralKey.text().strip() or None
+        if hasattr(self.v, 'cmbMistralModel'):
+            llm.mistral_model = self.v.cmbMistralModel.currentText().strip() or llm.mistral_model
 
         settings.save()
 
@@ -89,7 +103,7 @@ class SettingsController(QObject):
     #   Interne Helfer                                                 #
     # ---------------------------------------------------------------- #
     def _switch_provider(self, provider: str):
-        idx = {"openai":0, "azure":1, "ollama":2}.get(provider,0)
+        idx = {"openai":0, "azure":1, "ollama":2, "mistral":3}.get(provider,0)
         self.v.stwProviderForms.setCurrentIndex(idx)
         self._update_test_button_states()
 
@@ -99,6 +113,8 @@ class SettingsController(QObject):
             should_load = self.v.btnTestOpenAI.isEnabled()
         elif provider == "ollama":  # Skip Azure auto-load to avoid native crash
             should_load = self.v.btnTestOllama.isEnabled()
+        elif provider == "mistral":
+            should_load = getattr(self.v, 'btnTestMistral', None) is not None and self.v.btnTestMistral.isEnabled()
 
         # For Azure we currently disable automatic model loading due to
         # stability issues that lead to segmentation faults. Users can enter
@@ -130,7 +146,8 @@ class SettingsController(QObject):
         log.info(f"Populating model list for '{provider}' with {len(models)} models.")
         combo = {
             "openai": self.v.cmbOpenAIModel,
-            "ollama": self.v.cmbOllamaModel
+            "ollama": self.v.cmbOllamaModel,
+            "mistral": getattr(self.v, 'cmbMistralModel', None),
         }.get(provider)
 
         if not combo:
@@ -177,13 +194,13 @@ class SettingsController(QObject):
 
         # On success, immediately refresh model list for providers that support
         # dynamic models. (Azure requires deployment name, so we skip it.)
-        if success and provider in ("openai", "ollama"):
+        if success and provider in ("openai", "ollama", "mistral"):
             self._load_models(provider)
 
     # ---------------------------------------------------------------- #
     def _handle_successful_test(self, provider: str, success: bool, message: str):
         """If a test is successful, (re)load the models for that provider."""
-        if success and provider in ("openai", "ollama"):
+        if success and provider in ("openai", "ollama", "mistral"):
             log.info(f"Connection test for '{provider}' was successful, refreshing model list.")
             self._load_models(provider)
 
@@ -204,6 +221,11 @@ class SettingsController(QObject):
         # Ollama
         ollama_ready = bool(self.v.editOllamaBaseUrl.text().strip())
         self.v.btnTestOllama.setEnabled(ollama_ready)
+        
+        # Mistral
+        mistral_ready = bool(getattr(self.v, 'editMistralKey', None) and self.v.editMistralKey.text().strip())
+        if getattr(self.v, 'btnTestMistral', None):
+            self.v.btnTestMistral.setEnabled(mistral_ready)
 
     def _collect_temp_cfg(self):
         """Liest aktuelle UI-Werte in ein frisches `LLMSettings`-Objekt."""
@@ -217,5 +239,7 @@ class SettingsController(QObject):
             azure_api_key   = self.v.editAzureKey.text().strip() or None,
             azure_api_version = self.v.editAzureApiVersion.text().strip() or "2024-02-01",
             ollama_host     = self.v.editOllamaBaseUrl.text().strip(),
-            ollama_model    = self.v.cmbOllamaModel.currentText().strip() or "llama3"
+            ollama_model    = self.v.cmbOllamaModel.currentText().strip() or "llama3",
+            mistral_api_key = (self.v.editMistralKey.text().strip() if getattr(self.v, 'editMistralKey', None) else None),
+            mistral_model   = (self.v.cmbMistralModel.currentText().strip() if getattr(self.v, 'cmbMistralModel', None) else "mistral-small-latest"),
         )

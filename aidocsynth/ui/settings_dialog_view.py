@@ -90,6 +90,14 @@ class SettingsDialogView(QDialog):
         self.cmbProcessingMode.addItems(["Parallel", "Seriell"])
         allgemein_layout.addRow("Verarbeitungsmodus:", self.cmbProcessingMode)
 
+        # Max Parallel Processes
+        self.spinMaxParallel = QSpinBox()
+        self.spinMaxParallel.setObjectName("spinMaxParallel")
+        self.spinMaxParallel.setMinimum(1)
+        self.spinMaxParallel.setMaximum(32)  # Sensible upper limit
+        self.spinMaxParallel.setToolTip("Anzahl der Dokumente, die gleichzeitig verarbeitet werden sollen.")
+        allgemein_layout.addRow("Maximale parallele Prozesse:", self.spinMaxParallel)
+
         # OCR Max Pages
         self.spinOcrMaxPages = QSpinBox()
         self.spinOcrMaxPages.setObjectName("spinOcrMaxPages")
@@ -114,7 +122,7 @@ class SettingsDialogView(QDialog):
         
         self.cmbProvider = QComboBox()
         self.cmbProvider.setObjectName("cmbProvider")
-        self.cmbProvider.addItems(["openai", "azure", "ollama"])
+        self.cmbProvider.addItems(["openai", "azure", "ollama", "mistral"])
         self.cmbProvider.currentIndexChanged.connect(self._on_provider_changed)
         provider_form.addRow("Provider:", self.cmbProvider)
         llm_group_layout.addLayout(provider_form)
@@ -204,6 +212,30 @@ class SettingsDialogView(QDialog):
 
         self.stwProviderForms.addWidget(page_ollama)
 
+        # Page 3: Mistral
+        page_mistral = QWidget()
+        layout_mistral = QFormLayout(page_mistral)
+        layout_mistral.setLabelAlignment(Qt.AlignLeft)
+        layout_mistral.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        layout_mistral.setSpacing(8)
+
+        self.editMistralKey = QLineEdit()
+        self.editMistralKey.setEchoMode(QLineEdit.Password)
+        layout_mistral.addRow("API Key:", self.editMistralKey)
+
+        self.cmbMistralModel = QComboBox()
+        self.cmbMistralModel.setObjectName("cmbMistralModel")
+        self.cmbMistralModel.setEditable(True)
+        layout_mistral.addRow("Model:", self.cmbMistralModel)
+
+        self.btnTestMistral = QPushButton("Verbindung testen")
+        layout_mistral.addRow(self.btnTestMistral)
+        self.lblTestResultMistral = QLabel()
+        layout_mistral.addRow(self.lblTestResultMistral)
+        self.lblTestResultMistral.hide()
+
+        self.stwProviderForms.addWidget(page_mistral)
+
         llm_group_layout.addWidget(self.stwProviderForms)
         llm_group_box.setLayout(llm_group_layout)
         self.layout.addWidget(llm_group_box)
@@ -238,6 +270,8 @@ class SettingsDialogView(QDialog):
         self.editAzureDeploymentName.textChanged.connect(self.lblTestResultAzure.hide)
         self.editOllamaBaseUrl.textChanged.connect(self.lblTestResultOllama.hide)
         self.cmbOllamaModel.editTextChanged.connect(self.lblTestResultOllama.hide)
+        self.editMistralKey.textChanged.connect(self.lblTestResultMistral.hide)
+        self.cmbMistralModel.editTextChanged.connect(self.lblTestResultMistral.hide)
         self.cmbProvider.currentIndexChanged.connect(self.clear_all_test_results)
 
         # Signal connections for test button states are now handled in the controller
@@ -250,7 +284,8 @@ class SettingsDialogView(QDialog):
         label_map = {
             'openai': self.lblTestResultOpenAI,
             'azure': self.lblTestResultAzure,
-            'ollama': self.lblTestResultOllama
+            'ollama': self.lblTestResultOllama,
+            'mistral': self.lblTestResultMistral,
         }
         label = label_map.get(provider_name)
 
@@ -267,6 +302,7 @@ class SettingsDialogView(QDialog):
         self.lblTestResultOpenAI.hide()
         self.lblTestResultAzure.hide()
         self.lblTestResultOllama.hide()
+        self.lblTestResultMistral.hide()
 
     def set_buttons_enabled(self, enabled: bool):
         """Enables or disables all buttons that trigger long-running operations."""
@@ -274,6 +310,7 @@ class SettingsDialogView(QDialog):
         self.btnTestOpenAI.setEnabled(enabled)
         self.btnTestAzure.setEnabled(enabled)
         self.btnTestOllama.setEnabled(enabled)
+        self.btnTestMistral.setEnabled(enabled)
 
         # Also disable/enable standard dialog buttons
         self.button_box.button(QDialogButtonBox.Save).setEnabled(enabled)

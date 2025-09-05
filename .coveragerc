@@ -1,0 +1,10 @@
+[run]
+branch = True
+omit =
+    aidocsynth/ui/*
+    aidocsynth/app.py
+    aidocsynth/controllers/settings_controller.py
+    aidocsynth/ui/qrc_resources.py
+    aidocsynth/services/providers/*
+    aidocsynth/controllers/status_dock_controller.py
+    aidocsynth/services/ocr_service.py

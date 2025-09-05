@@ -19,3 +19,10 @@ aidocsynth/ui/qrc_resources.py
 build/
 dist/
 .build/
+
+# Test & Coverage Artifacts
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml

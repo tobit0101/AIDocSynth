@@ -22,6 +22,9 @@ class LLMSettings(BaseModel):
     # Ollama
     ollama_host: str = "http://localhost:11434"
     ollama_model: str = "llama3"
+    # Mistral
+    mistral_api_key: str | None = None
+    mistral_model: str = "mistral-small-latest"
 
 class AppSettings(BaseModel):
     work_dir: Path = Field(default_factory=_default_work_dir)
@@ -31,6 +34,7 @@ class AppSettings(BaseModel):
     create_backup: bool = True
     sort_action: str = "copy"        # copy | move
     processing_mode: str = "parallel"  # parallel | serial
+    max_parallel_processes: int = 4
     llm: LLMSettings = Field(default_factory=LLMSettings)
 
     model_config = {"extra": "forbid"}            # Fehlertyp statt stilles Ignorieren

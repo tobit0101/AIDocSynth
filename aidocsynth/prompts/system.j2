@@ -40,12 +40,13 @@ WICHTIG: FOKUSIERE dich auf den Hauptinhalt des Quelldokuments und IGNORIERE Zus
     - FORMAT: Array
 
 11. target_directory
-    - FUNKTION: Optimaler relativer Zielverzeichnispfad
-    - FORMAT: Verzeichnisstruktur mit semantischen Ebenen
+    - FUNKTION: Optimaler RELATIVER Zielverzeichnispfad (bezogen auf das Arbeitsverzeichnis)
+    - FORMAT: Verzeichnisstruktur mit semantischen Ebenen, KEIN führender Schrägstrich, KEINE absoluten Pfade
     - REGELN:
       * EXAKT bestehenden Pfad verwenden, wenn semantisch passend
       * Neue Pfade erstellen wenn semantisch sinnvoll
       * Vermeide tiefe Ebenenstrukturen
+      * Gib IMMER einen relativen Pfad zurück (Beispiel: "Dokumente/Tests/OCR" statt "/Dokumente/Tests/OCR")
     - EBENEN (nur wenn nötig):
       * Domain/Arbeitsbereich (oberste Ebene)
       * Themenbereich/Fachgebiet
@@ -73,7 +74,7 @@ ZIEL AUSGABE:
   "description": "...",
   "comment": "...",
   "keywords": ["...", "...", "..."],
-  "target_directory": "/.../.../.../",
+  "target_directory": ".../.../.../",
   "target_filename": "headline_yyyymmdd_specifier.ext"
 }
 ```

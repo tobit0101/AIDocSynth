@@ -89,6 +89,30 @@ pip install -r requirements.txt
 python -m aidocsynth.app
 ```
 
+### Tests ausführen
+
+- Alle Tests (Standard, inkl. real/e2e):
+
+```bash
+pytest -q
+```
+
+- Feature‑Tests (schnell, ohne schwere Modelle):
+
+```bash
+pytest -q -m feature
+```
+
+- Nur End‑to‑End (Ollama) Tests explizit ausführen:
+
+```bash
+# Voraussetzungen: laufender Ollama Server (default http://localhost:11434)
+# Optional: OLLAMA_HOST und OLLAMA_MODEL setzen
+pytest -q -m e2e
+```
+
+> Hinweis: E2E-Tests laufen unter realen Bedingungen (echte Services/Modelle). Wenn du nur schnelle Tests willst, nutze `-m "not e2e"`.
+
 ### Ordnerstruktur (Kurz‑Überblick)
 
 ```text
@@ -100,6 +124,7 @@ AIDocSynth/
 │  ├─ ui/                # Qt‑Designer .ui oder Python‑Views
 │  └─ app.py             # Entry‑Point (Qt‑Application)
 ├─ tests/                # pytest Smoke‑ & Unit‑Tests
+├─ tests/e2e/            # E2E‑Tests (manuell ausführen)
 └─ build/                # PyInstaller‑Spec & Ressourcen
 ```
 

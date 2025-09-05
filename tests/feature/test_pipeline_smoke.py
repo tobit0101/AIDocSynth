@@ -1,7 +1,7 @@
-import tempfile
 import asyncio
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
+import pytest
 
 from PySide6.QtCore import Qt
 
@@ -45,17 +45,16 @@ class MockMetadataService:
         """Mocks metadata retrieval."""
         return {}
 
-def test_pipeline_and_table_update(mocker):
+@pytest.mark.qt
+@pytest.mark.feature
+def test_pipeline_and_table_update(mocker, workspace_dirs, mock_llm, qtbot):
     """A full smoke test for the main processing pipeline that also verifies table model updates."""
     # Mock components that run in a separate process to avoid PicklingError
     mocker.patch("aidocsynth.controllers.main_controller.full_text", new=dummy_full_text)
     mocker.patch("aidocsynth.controllers.main_controller.FileManager", new=MockFileManager)
     mocker.patch("aidocsynth.controllers.main_controller.MetadataService", new=MockMetadataService)
 
-    # Mock the LLM provider
-    mock_provider_instance = AsyncMock()
-    mock_provider_instance.classify_document = AsyncMock(return_value={"target_directory": "smoke", "target_filename": "test.txt"})
-    mocker.patch("aidocsynth.controllers.main_controller.get_provider", lambda cfg: mock_provider_instance)
+    # LLM provider is mocked via mock_llm fixture
 
     # Mock controller dependencies
     mock_view = MagicMock()
@@ -70,33 +69,28 @@ def test_pipeline_and_table_update(mocker):
     controller.jobAdded.connect(tbl_model.add_job)
     controller.jobUpdated.connect(tbl_model.refresh)
 
-    # Setup
-    with tempfile.TemporaryDirectory() as temp_dir_str:
-        temp_dir = Path(temp_dir_str)
-        settings.data.work_dir = temp_dir
-        settings.data.backup_root = temp_dir / "backup"
-        settings.data.unsorted_root = temp_dir / "unsorted"
+    # Setup using shared workspace
+    temp_dir = workspace_dirs
+    dummy_file = temp_dir / "smoke_test.pdf"
+    dummy_file.touch()
 
-        dummy_file = temp_dir / "smoke_test.pdf"
-        dummy_file.touch()
+    # Action
+    job = Job(path=str(dummy_file))
 
-        # Action
-        job = Job(path=str(dummy_file))
+    # Simulate job being added and check table model
+    controller.jobAdded.emit(job)
+    assert tbl_model.rowCount() == 1, "Job should be added to the model immediately"
 
-        # Simulate job being added and check table model
-        controller.jobAdded.emit(job)
-        assert tbl_model.rowCount() == 1, "Job should be added to the model immediately"
+    # Run the pipeline
+    asyncio.run(controller._pipeline(job))
 
-        # Run the pipeline
-        asyncio.run(controller._pipeline(job))
+    # Assert pipeline completion
+    assert job.status == "done", f"Pipeline failed with status: {job.status}"
+    sorted_path = settings.data.work_dir / "T" / "x.txt"
+    assert sorted_path.exists(), f"Sorted file not found at {sorted_path}"
 
-        # Assert pipeline completion
-        assert job.status == "done", f"Pipeline failed with status: {job.status}"
-        sorted_path = settings.data.work_dir / "smoke" / "test.txt"
-        assert sorted_path.exists(), f"Sorted file not found at {sorted_path}"
-
-        # Assert table model update after pipeline completion
-        assert tbl_model.rowCount() == 1, "Row count should remain 1 after update"
-        idx_status = tbl_model.index(0, 1)  # Column 1 for Status
-        assert tbl_model.data(idx_status, Qt.DisplayRole) == "done"
+    # Assert table model update after pipeline completion
+    assert tbl_model.rowCount() == 1, "Row count should remain 1 after update"
+    idx_status = tbl_model.index(0, 2)  # Column 2 for Status
+    assert tbl_model.data(idx_status, Qt.DisplayRole) == "done"
 

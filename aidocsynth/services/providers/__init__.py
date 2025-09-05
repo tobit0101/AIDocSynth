@@ -5,5 +5,6 @@ from . import dummy_provider
 from . import ollama_provider
 from . import openai_provider
 from . import azure_provider
+from . import mistral_provider
 
 from .base import get_provider
