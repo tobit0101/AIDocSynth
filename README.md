@@ -89,6 +89,25 @@ pip install -r requirements.txt
 python -m aidocsynth.app
 ```
 
+### CLI-Start & Log-Level
+
+Wenn AIDocSynth bei dir nicht startet oder unerwartet beendet wird, kannst du es über das Terminal mit erhöhtem Log-Level starten, um Fehlermeldungen zu sehen.
+
+**Gebaute Anwendung (Download / Installer):**
+
+```bash
+# macOS – im Ordner, in dem AIDocSynth.app liegt
+./AIDocSynth.app/Contents/MacOS/AIDocSynth --loglevel DEBUG
+# Windows – im Ordner, in dem AIDocSynth.exe liegt
+AIDocSynth.exe --loglevel DEBUG
+```
+
+**Checkout / Entwicklungsversion:**
+
+```bash
+python run.py --loglevel DEBUG   # Alternativen: INFO (Standard), WARNING, ERROR, CRITICAL
+```
+
 ### Tests ausführen
 
 - Alle Tests (Standard, inkl. real/e2e):
@@ -143,6 +162,7 @@ AIDocSynth/
 
 * [x] **MVP** mit OpenAI‑Workflow & Basis‑GUI
 * [x] Job History mit Aktiv/Abgeschlossen Prozessen
+* [ ] Vollständige Testabdeckung
 * [ ] Wizard für Ersteinrichtung (API‑Keys, Ordnerwahl)
 * [ ] Automatische Überwachung eines »Eingang«‑Ordners
 * [ ] Mehrsprachige UI (i18n)
