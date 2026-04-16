@@ -38,6 +38,22 @@ import json
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, PackageLoader, select_autoescape
 
+# Static text content for testing when no text file is provided
+STATIC_TEXT_CONTENT = """This is a sample document for testing the prompt functionality. It contains various types of content that would typically be found in documents that need classification and analysis.
+
+The document discusses different aspects of document processing including:
+- Text extraction and formatting
+- Content categorization
+- Metadata analysis
+- Document structure recognition
+
+This sample text is designed to work with the AI classification system to demonstrate how different document types can be processed and categorized automatically."""
+
+# Static parameters for default values
+DEFAULT_SYSTEM_PROMPT = "aidocsynth/prompts/system.j2"
+DEFAULT_ANALYSIS_PROMPT = "aidocsynth/prompts/analysis.j2"
+DEFAULT_MODEL = "qwen3.5:27b-q8_0"
+
 async def run_prompt_test(system_prompt_path: Path | None, analysis_prompt_path: Path | None, text_file_path: Path | None, context_path: Path | None, model: str):
     """
     Runs a test against the Ollama API with the given prompts and text file.
@@ -62,10 +78,12 @@ async def run_prompt_test(system_prompt_path: Path | None, analysis_prompt_path:
         if 'directory_structure' in context and isinstance(context.get('directory_structure'), list):
             context['directory_structure'] = '\n'.join(context['directory_structure'])
         
+        # 3. Set static text content if no file is provided
         if not text_file_path:
-            print("Error: --text is required (path to a text payload to classify)", file=sys.stderr)
-            return
-        text_content = text_file_path.read_text(encoding='utf-8')
+            # Default static text content for testing
+            text_content = STATIC_TEXT_CONTENT
+        else:
+            text_content = text_file_path.read_text(encoding='utf-8')
         context['content'] = text_content
 
         # 3. Render prompts
@@ -106,7 +124,11 @@ async def run_prompt_test(system_prompt_path: Path | None, analysis_prompt_path:
             print(f"--- Analysis Prompt (override): {analysis_prompt_path.name} ---")
         else:
             print("--- Analysis Prompt: aidocsynth/prompts/analysis.j2 ---")
-        print(f"--- Text File: {text_file_path.name} ---\n")
+        if text_file_path:
+            print(f"--- Text File: {text_file_path.name} ---")
+        else:
+            print("--- Text Content: Static sample text ---")
+        print()
 
         # 6. Call Ollama API
         response = await client.chat(
@@ -115,6 +137,7 @@ async def run_prompt_test(system_prompt_path: Path | None, analysis_prompt_path:
             stream=False,
             format="json",  # Force JSON output
             options={"temperature": 0.0}  # Use 0.0 for deterministic testing
+            think=False
         )
 
         print("\n--- Parsed JSON Response ---")
@@ -141,20 +164,20 @@ async def main():
     parser.add_argument(
         "--system",
         type=Path,
-        default=None,
+        default=DEFAULT_SYSTEM_PROMPT,
         help="Optional path to a custom system prompt file. Defaults to aidocsynth/prompts/system.j2."
     )
     parser.add_argument(
         "--analysis",
         type=Path,
-        default=None,
+        default=DEFAULT_ANALYSIS_PROMPT,
         help="Optional path to a custom analysis prompt file. Defaults to aidocsynth/prompts/analysis.j2."
     )
     parser.add_argument(
         "--text",
         type=Path,
-        required=True,
-        help="Path to the example text file to classify."
+        required=False,
+        help="Path to the example text file to classify. If not provided, uses static sample text."
     )
     parser.add_argument(
         "--context",
@@ -165,7 +188,7 @@ async def main():
     parser.add_argument(
         "--model",
         type=str,
-        default="llama3.1:8b-instruct-q8_0",
+        default=DEFAULT_MODEL,
         help="The Ollama model to use for the test (default: llama3.1:8b-instruct-q8_0)."
     )
 
