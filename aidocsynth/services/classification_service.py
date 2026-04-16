@@ -58,9 +58,6 @@ class ClassificationService:
             directory_structure_json=directory_structure_json
         )
 
-        self.logger.debug(f"System Prompt:\n{system_prompt}")
-        self.logger.debug(f"User Prompt for {target_filename_string}:\n{user_prompt}")
-
         # Start overall timer to measure processing duration
         overall_start = time.perf_counter()
 

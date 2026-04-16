@@ -94,6 +94,7 @@ class OllamaProvider(ProviderBase):
         super().__init__(cfg)
         self.model = cfg.ollama_model
         self.host = cfg.ollama_host
+        self.think_enabled = cfg.ollama_think
         
         # Initialize client with error handling
         try:
@@ -188,7 +189,8 @@ class OllamaProvider(ProviderBase):
                 messages=messages,
                 stream=False,
                 format="json",
-                options={"temperature": 0.1}
+                options={"temperature": 0.1},
+                think=self.think_enabled
             )
             
             # Wait for response with cancellation support

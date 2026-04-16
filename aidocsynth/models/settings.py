@@ -22,6 +22,8 @@ class LLMSettings(BaseModel):
     # Ollama
     ollama_host: str = "http://localhost:11434"
     ollama_model: str = "llama3"
+    ollama_think: bool = True
+    log_prompts: bool = False
     # Mistral
     mistral_api_key: str | None = None
     mistral_model: str = "mistral-small-latest"

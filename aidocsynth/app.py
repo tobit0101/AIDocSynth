@@ -7,6 +7,8 @@ import logging
 import os
 import time
 import asyncio
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 
 # For macOS foreground activation
@@ -82,17 +84,32 @@ def load_main_application(splash):
     pool.start(worker)
 
 def setup_logging(level="INFO"):
-    """
-    Configures the root logger.
-    """
+    """Configures the root logger for console and file output."""
     log_level = getattr(logging, level.upper(), logging.INFO)
-    logging.basicConfig(
-        level=log_level,
-        format='%(asctime)s - %(levelname)s - [%(name)s:%(lineno)d] - %(message)s',
+    
+    # Basis-Ordner für Logs definieren
+    log_dir = Path.home() / ".config" / "AIDocSynth" / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / "app.log"
+
+    formatter = logging.Formatter(
+        '%(asctime)s - %(levelname)s - [%(name)s:%(lineno)d] - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
+
+    # File Handler (max 5 MB, behält die letzten 3 Dateien)
+    file_handler = RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=3, encoding='utf-8')
+    file_handler.setFormatter(formatter)
+
+    # Console Handler
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+
+    # Basic Config mit beiden Handlern
+    logging.basicConfig(level=log_level, handlers=[file_handler, console_handler])
+    
     logger = logging.getLogger("AIDocSynth")
-    logger.info(f"Logging initialized with level {level}")
+    logger.info(f"Logging initialized. App-Log: {log_file}")
     return logger
 
 

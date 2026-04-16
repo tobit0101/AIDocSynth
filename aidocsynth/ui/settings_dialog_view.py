@@ -204,6 +204,10 @@ class SettingsDialogView(QDialog):
         self.cmbOllamaModel.setEditable(True)
         layout_ollama.addRow("Model:", self.cmbOllamaModel)
 
+        self.chkOllamaThink = QCheckBox("Think-Prozess aktivieren")
+        self.chkOllamaThink.setObjectName("chkOllamaThink")
+        layout_ollama.addRow("Optionen:", self.chkOllamaThink)
+
         self.btnTestOllama = QPushButton("Verbindung testen")
         layout_ollama.addRow(self.btnTestOllama)
         self.lblTestResultOllama = QLabel()
@@ -239,6 +243,23 @@ class SettingsDialogView(QDialog):
         llm_group_layout.addWidget(self.stwProviderForms)
         llm_group_box.setLayout(llm_group_layout)
         self.layout.addWidget(llm_group_box)
+
+        # --- System & Logging Group ---
+        log_group_box = self._create_group_box("System & Logging")
+        log_layout = QFormLayout()
+        log_layout.setLabelAlignment(Qt.AlignLeft)
+        
+        self.chkLogPrompts = QCheckBox("KI-Prompts in Datei speichern")
+        self.chkLogPrompts.setObjectName("chkLogPrompts")
+        log_layout.addRow("Datenschutz:", self.chkLogPrompts)
+        
+        self.btnOpenLogDir = QPushButton("Log-Ordner öffnen")
+        self.btnOpenLogDir.setMaximumWidth(200)
+        log_layout.addRow("Dateien:", self.btnOpenLogDir)
+        
+        log_group_box.setLayout(log_layout)
+        
+        self.layout.addWidget(log_group_box)
 
         # Add flexible space between sections and buttons
         self.layout.addStretch(1)

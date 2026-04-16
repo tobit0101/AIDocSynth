@@ -8,6 +8,8 @@ import re
 import logging
 from pathlib import Path
 from aidocsynth.models.settings import LLMSettings
+import datetime
+from aidocsynth.services.settings_service import settings
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +87,39 @@ class ProviderBase(ABC):
             {"role": "user", "content": user_prompt},
         ]
         response_text = await self._run(messages, is_cancelled_callback=is_cancelled_callback)
+
+        # --- KI-Logging ---
+        if settings.data.llm.log_prompts:
+            try:
+                # Eigener Unterordner für die Markdown-Dumps
+                log_dir = Path.home() / ".config" / "AIDocSynth" / "logs" / "llm_prompts"
+                log_dir.mkdir(parents=True, exist_ok=True)
+                
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                provider_name = self.name
+                log_file = log_dir / f"{timestamp}_{provider_name}.md"
+                
+                with open(log_file, "w", encoding="utf-8") as f:
+                    f.write(f"# LLM Debug Log ({timestamp})\n\n")
+                    f.write(f"**Provider:** {provider_name}\n")
+                    f.write(f"**Model:** {getattr(self, 'model', 'Unbekannt')}\n\n")
+                    
+                    f.write("## System Prompt\n```text\n")
+                    f.write(system_prompt)
+                    f.write("\n```\n\n")
+                    
+                    f.write("## User Prompt (OCR Text)\n```text\n")
+                    f.write(user_prompt)
+                    f.write("\n```\n\n")
+                    
+                    f.write("## Raw Response\n```json\n")
+                    f.write(response_text)
+                    f.write("\n```\n")
+                
+                self.logger.info(f"KI-Debug-Log gespeichert: {log_file}")
+            except Exception as e:
+                self.logger.error(f"Fehler beim Speichern des KI-Logs: {e}")
+
         # Clean the response: remove markdown code fences and strip whitespace
         match = re.search(r"```(json)?(.*)```", response_text, re.DOTALL)
         if match:

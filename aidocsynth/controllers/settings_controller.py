@@ -1,11 +1,12 @@
 from pathlib import Path
-from PySide6.QtCore import QObject, Signal, Qt, QThreadPool
+from PySide6.QtCore import QObject, Signal, Qt, QThreadPool, QUrl
 from aidocsynth.services.settings_service import settings
 from aidocsynth.services import providers
 from aidocsynth.utils.worker import Worker
 from aidocsynth.utils.connection_utils import test_provider_connection
 from aidocsynth.utils.async_worker import fetch_models_async
 import logging, asyncio
+from PySide6.QtGui import QDesktopServices
 
 log = logging.getLogger(__name__)
 
@@ -36,6 +37,8 @@ class SettingsController(QObject):
         self.v.editOllamaBaseUrl.textChanged.connect(self._update_test_button_states)
         self.v.editMistralKey.textChanged.connect(self._update_test_button_states)
 
+        self.v.btnOpenLogDir.clicked.connect(self._open_log_directory)
+
         self.load()
         self._update_test_button_states() # Set initial state
 
@@ -54,6 +57,7 @@ class SettingsController(QObject):
         self.v.spinMaxParallel.setValue(s.max_parallel_processes)
         self.v.spinOcrMaxPages.setValue(s.ocr_max_pages)
 
+        self.v.chkLogPrompts.setChecked(llm.log_prompts)
         self.v.cmbProvider.setCurrentText(llm.provider)
         self.v.editOpenAIKey.setText(llm.openai_api_key or "")
         self.v.cmbOpenAIModel.setEditText(llm.openai_model)
@@ -63,6 +67,7 @@ class SettingsController(QObject):
         self.v.editAzureApiVersion   .setText(llm.azure_api_version)
         self.v.editOllamaBaseUrl     .setText(llm.ollama_host)
         self.v.cmbOllamaModel.setEditText(llm.ollama_model)
+        self.v.chkOllamaThink.setChecked(llm.ollama_think)
         # Mistral
         if hasattr(self.v, 'editMistralKey'):
             self.v.editMistralKey.setText(llm.mistral_api_key or "")
@@ -82,6 +87,7 @@ class SettingsController(QObject):
         s.max_parallel_processes = self.v.spinMaxParallel.value()
         s.ocr_max_pages = self.v.spinOcrMaxPages.value()
 
+        llm.log_prompts = self.v.chkLogPrompts.isChecked()
         llm.provider        = self.v.cmbProvider.currentText()
         llm.openai_api_key  = self.v.editOpenAIKey.text().strip() or None
         llm.openai_model    = self.v.cmbOpenAIModel.currentText().strip()
@@ -91,6 +97,7 @@ class SettingsController(QObject):
         llm.azure_api_version = self.v.editAzureApiVersion.text().strip() or llm.azure_api_version
         llm.ollama_host     = self.v.editOllamaBaseUrl.text().strip()
         llm.ollama_model    = self.v.cmbOllamaModel.currentText().strip()
+        llm.ollama_think    = self.v.chkOllamaThink.isChecked()
         # Mistral
         if hasattr(self.v, 'editMistralKey'):
             llm.mistral_api_key = self.v.editMistralKey.text().strip() or None
@@ -240,6 +247,14 @@ class SettingsController(QObject):
             azure_api_version = self.v.editAzureApiVersion.text().strip() or "2024-02-01",
             ollama_host     = self.v.editOllamaBaseUrl.text().strip(),
             ollama_model    = self.v.cmbOllamaModel.currentText().strip() or "llama3",
+            ollama_think    = self.v.chkOllamaThink.isChecked(),
+            log_prompts     = self.v.chkLogPrompts.isChecked(),
             mistral_api_key = (self.v.editMistralKey.text().strip() if getattr(self.v, 'editMistralKey', None) else None),
             mistral_model   = (self.v.cmbMistralModel.currentText().strip() if getattr(self.v, 'cmbMistralModel', None) else "mistral-small-latest"),
         )
+
+    def _open_log_directory(self):
+        """Öffnet den Logging-Ordner im Standard-Dateibrowser des Systems."""
+        log_dir = Path.home() / ".config" / "AIDocSynth" / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(log_dir)))
