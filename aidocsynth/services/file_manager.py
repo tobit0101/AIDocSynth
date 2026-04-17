@@ -142,15 +142,24 @@ class FileManager:
                 self._walk_directory(p, root_path, dir_list)
 
     def get_formatted_directory_structure(self) -> str:
-        """Gets the directory structure and formats it as a string for prompts."""
+        """Gets the directory structure and formats it as an indented tree for LLM prompts."""
         dir_tuples = self.get_directory_structure()
-        directory_structure = ""
+        tree_lines = []
+        
         for path, count in dir_tuples:
-            if count > 0:
-                directory_structure += f"{path}/ [Files: {count}]\n"
-            else:
-                directory_structure += f"{path}/\n"
-        return directory_structure
+            # Pfad in Ebenen aufteilen
+            parts = path.strip('/').split('/')
+            depth = len(parts) - 1
+            folder_name = parts[-1]
+            
+            # Einrückung (2 Leerzeichen pro Ebene)
+            indent = "  " * depth
+            # Dateianzahl nur anzeigen, wenn > 0
+            count_str = f" ({count})" if count > 0 else ""
+            
+            tree_lines.append(f"{indent}{folder_name}{count_str}")
+            
+        return "\n".join(tree_lines)
 
     def process_document(self, src_path: Path, classification_data: dict) -> Optional[Path]:
         """Sorts a document by copying or moving it to the target directory based on settings.

@@ -88,6 +88,11 @@ class ClassificationService:
                         "Invalid classification result – missing required keys 'target_filename' and/or 'target_directory'."
                     )
 
+                # --- Log thought process ---
+                thought_process  = classification_data.get("gedankengang", "Kein Gedankengang angegeben.")
+                self.logger.info(f"[{target_filename_string}] AI-Thought Process: {thought_process}")
+                # ------------------------------------
+
                 # Success – log and return (include timing)
                 overall_duration = time.perf_counter() - overall_start
                 self.logger.info(

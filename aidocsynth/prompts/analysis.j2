@@ -1,24 +1,22 @@
+<file_info>
 Quelldatei: `{{ target_filename_string }}`
+</file_info>
 
-Quellmetadaten: 
-```json
+<metadata>
 {{ metadata_string }}
-```
+</metadata>
 
-Quelldokument: 
-```text
+<document_content>
 {{ content_string }}
-```
+</document_content>
 
-Quellverzeichnisstruktur:
-```text
+<directory_structure>
 {{ directory_structure_json }}
-```
+</directory_structure>
 
 ---
 
-ZIEL AUSGABE:
-```json
+<output_schema>
 {
   "headline": "...",
   "specifier": "...",
@@ -30,7 +28,8 @@ ZIEL AUSGABE:
   "description": "...",
   "comment": "...",
   "keywords": ["...", "...", "..."],
+  "gedankengang": "...",
   "target_directory": ".../.../.../",
   "target_filename": "headline_yyyymmdd_specifier.ext"
 }
-```
+</output_schema>
