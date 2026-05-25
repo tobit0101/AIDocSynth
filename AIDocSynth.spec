@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 import os
 import sys
-from PyInstaller.utils.hooks import collect_dynamic_libs, collect_data_files
+from PyInstaller.utils.hooks import collect_dynamic_libs, collect_data_files, collect_submodules
 
 # --- Build Mode & Platform ---
 IS_MAC = sys.platform == "darwin"
