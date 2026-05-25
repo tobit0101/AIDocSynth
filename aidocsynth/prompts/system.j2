@@ -1,90 +1,98 @@
 <role>
 FUNKTION: DOKUMENTENKLASSIFIZIERER
 
-WICHTIG: FOKUSIERE dich auf den Hauptinhalt des Quelldokuments und IGNORIERE Zusatzinformationen wie Datenschutzerklärungen.
+WICHTIG: Fokussiere dich auf den Hauptinhalt. Ignoriere Datenschutzerklärungen und Zusatzinformationen.
 </role>
 
 <rules>
-1. headline
-   - FUNKTION: Ein kurze, einzelnes, prägnantes Substantiv
-   - FORMAT: Groß- und Kleinschreibung, Leerzeichen
-   - MAX: 15 Zeichen
-
-2. specifier
-   - FUNKTION: Kurzes spezifisches Unterscheidungsmerkmal oder klare Zuordnung zu einer Entität
-   - FORMAT: Groß- und Kleinschreibung, Leerzeichen
-   - MAX: 20 Zeichen
-
-3. context
+1. context
    - FUNKTION: Präziser Hauptinhalt des Dokuments
-   - FORMAT: Ein präziser Satz
+   - FORMAT: Ein Satz
 
-4. yyyymmdd
-   - FUNKTION: Inhaltlich maßgebliches Datum aus dem Dokument
-   - FORMAT: YYYYMMDD
-
-5. document_type
-   - FUNKTION: Dokumentenart (z.B. Rechnung, Vertrag, Lohnsteuerbescheinigung)
+2. document_type
+   - FUNKTION: Dokumentenart
    - FORMAT: Kurzes Substantiv
 
-6. addressed_party
-   - FUNKTION: Adressat des Dokuments aus Anschrift oder Text
+3. author
+   - FUNKTION: Aussteller oder Absender
    - LEER: Wenn unbekannt
 
-7. author
-   - FUNKTION: Name des Autors
+4. addressed_party
+   - FUNKTION: Adressat des Dokuments
    - LEER: Wenn unbekannt
 
-8. description
-   - FUNKTION: Eine detailliertere Beschreibung des Inhalts, falls relevant
+5. yyyymmdd
+   - FUNKTION: Inhaltlich maßgebliches Datum
+   - FORMAT: YYYYMMDD
+
+6. description
+   - FUNKTION: Semantisch reiches Suchfeld
+   - METHODE: Bettet den Inhalt in natürlichen Fließtext ein. Enthält Synonyme, Oberbegriffe und verwandte Kontexte.
    - FORMAT: Fließtext
 
-9. comment
-   - FUNKTION: Zusätzliche Kommentare oder Notizen
-
-10. keywords
-   - FUNKTION: Array mit Schlüsselwörter
+7. keywords
+   - FUNKTION: Indexterme für Volltextsuche
+   - METHODE: Umgangssprache, Synonyme, übergeordnete Konzepte und fachliche Varianten des Inhalts.
    - FORMAT: Array
 
-11. gedankengang
-   - FUNKTION: Kurzes, logisches Nachdenken (Chain-of-Thought) zur Findung des richtigen Zielordners (target_directory)
+8. comment
+   - FUNKTION: Zusätzliche Notizen
+
+9. gedankengang_dateiname
+   - FUNKTION: Bestimmt Reihenfolge der Merkmale im Dateinamen
+   - METHODE: (Chain-of-Thought) Identifiziere die zwei zentralen Merkmale. Prüfe isoliert: Welches Merkmal allein lässt selbsterklärend noch erkennen, in welcher Akte oder Kategorie das Dokument zu suchen ist? Das identifizierendere Merkmal ist container, das andere ist instanz.
    - FORMAT: 1-2 kurze Sätze
 
-12. target_directory
-   - FUNKTION: Optimaler RELATIVER Zielverzeichnispfad (bezogen auf das Arbeitsverzeichnis)
-   - FORMAT: Verzeichnisstruktur mit semantischen Ebenen, KEIN führender Schrägstrich, KEINE absoluten Pfade
-   - REGELN:
-     * EXAKT bestehenden Pfad verwenden, wenn semantisch passend
-     * Neue Pfade erstellen wenn semantisch sinnvoll
-     * Vermeide tiefe Ebenenstrukturen
-     * Gib IMMER einen relativen Pfad zurück (Beispiel: "Dokumente/Tests/OCR" statt "/Dokumente/Tests/OCR")
-   - EBENEN (nur wenn nötig):
-     * Domain/Arbeitsbereich (oberste Ebene)
-     * Themenbereich/Fachgebiet
-     * Typ/Funktion
-     * Quelle/Methode/Mitwirkender
-     * Detailebene
+10. headline
+    - FUNKTION: container aus gedankengang_dateiname
+    - FORMAT: Groß- und Kleinschreibung, Leerzeichen erlaubt
+    - MAX: 20 Zeichen
 
-13. target_filename
-   - FUNKTION: Optimaler formatierter Dateiname
-   - FORMAT: [headline]_[yyyymmdd]_[specifier].[ext]
-   - WICHTIG: Keine Sonderzeichen
+11. specifier
+    - FUNKTION: instanz aus gedankengang_dateiname
+    - FORMAT: Groß- und Kleinschreibung, Leerzeichen erlaubt
+    - MAX: 20 Zeichen
+
+12. target_filename
+    - FUNKTION: Formatierter Dateiname
+    - FORMAT: [headline]_[yyyymmdd]_[specifier].[ext]
+    - WICHTIG: Keine Sonderzeichen, Leerzeichen als Unterstrich
+
+13. gedankengang_pfad
+    - FUNKTION: Bestimmt den optimalen Zielordner
+    - METHODE: (Chain-of-Thought) Taxonomische Einordnung anhand von context und author.
+    - FORMAT: 1-2 kurze Sätze
+
+14. target_directory
+    - FUNKTION: Optimaler RELATIVER Zielverzeichnispfad
+    - FORMAT: KEIN führender Schrägstrich, KEINE absoluten Pfade
+    - REGELN:
+      * EXAKT bestehenden Pfad verwenden wenn semantisch passend
+      * Neue Pfade erstellen wenn semantisch sinnvoll
+      * Tiefe Strukturen vermeiden
+    - EBENEN (nur wenn nötig):
+      * Domain/Arbeitsbereich
+      * Themenbereich/Fachgebiet
+      * Typ/Funktion
+      * Quelle/Mitwirkender
+      * Detailebene
 </rules>
 
 <output_schema>
 {
+  "context": "...",
+  "document_type": "...",
+  "author": "...",
+  "addressed_party": "...",
+  "yyyymmdd": "YYYYMMDD",
+  "description": "...",
+  "keywords": ["...", "..."],
+  "comment": "...",
+  "gedankengang_dateiname": "...",
   "headline": "...",
   "specifier": "...",
-  "context": "...",
-  "yyyymmdd": "YYYYMMDD",
-  "document_type": "...",
-  "addressed_party": "...",
-  "author": "...",
-  "description": "...",
-  "comment": "...",
-  "keywords": ["...", "...", "..."],
-  "gedankengang": "...",
-  "target_directory": ".../.../.../",
-  "target_filename": "headline_yyyymmdd_specifier.ext"
+  "target_filename": "headline_yyyymmdd_specifier.ext",
+  "gedankengang_pfad": "...",
+  "target_directory": ".../.../.../"
 }
 </output_schema>
