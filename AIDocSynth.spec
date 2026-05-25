@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 import os
 import sys
-from PyInstaller.utils.hooks import collect_dynamic_libs, collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_dynamic_libs, collect_data_files, collect_all
 
 # --- Build Mode & Platform ---
 IS_MAC = sys.platform == "darwin"
@@ -11,16 +11,19 @@ dev = os.getenv("PYI_MODE", "release") == "dev"
 # --- Data Collection Helpers ---
 pyside_plugins = collect_data_files("PySide6", subdir="plugins", include_py_files=False)
 
+# Wir sammeln alle daten, binaries und imports von mistralai
+mistral_datas, mistral_binaries, mistral_hiddenimports = collect_all('mistralai')
+
 a = Analysis(
     ['run.py'],
     pathex=[],
     # --- Qt / PySide6 Plugins & Shiboken --- 
-    binaries=collect_dynamic_libs("PySide6") + collect_dynamic_libs("shiboken6") + collect_dynamic_libs("torchvision"),
+    binaries=collect_dynamic_libs("PySide6") + collect_dynamic_libs("shiboken6") + collect_dynamic_libs("torchvision") + mistral_binaries,
     # --- Data Files ---
     datas=pyside_plugins + [
         ('aidocsynth/ui/resources', 'aidocsynth/ui/resources'),
         ('aidocsynth/prompts', 'aidocsynth/prompts')
-    ],
+    ] + mistral_datas,
     # --- Hidden Imports ---
     hiddenimports=[
         'scipy._cyutility',
@@ -30,8 +33,7 @@ a = Analysis(
         'httpx',
         'anyio',
         'ollama',
-        'mistralai',
-    ] + collect_submodules('mistralai'),
+    ] + mistral_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -60,7 +62,6 @@ exe = EXE(
 )
 
 # --- macOS App Bundle ---
-# This section is only executed when building on macOS.
 if IS_MAC:
     app = BUNDLE(
         exe,

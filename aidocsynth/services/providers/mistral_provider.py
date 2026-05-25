@@ -5,7 +5,6 @@ from mistralai import Mistral
 
 from .base import ProviderBase, register
 
-
 @register
 class MistralProvider(ProviderBase):
     name = "mistral"
@@ -13,7 +12,6 @@ class MistralProvider(ProviderBase):
     def __init__(self, cfg):
         super().__init__(cfg)
         self.model = cfg.mistral_model
-        # Initialize client
         try:
             self.cli = Mistral(api_key=cfg.mistral_api_key)
         except Exception as e:
@@ -21,38 +19,19 @@ class MistralProvider(ProviderBase):
             self.cli = None
 
     async def close(self):
-        """Close the Mistral client if it exposes an async/sync close method."""
-        if not hasattr(self, 'cli') or not self.cli:
-            return
-        client = self.cli
-        # Prefer async close if available
-        if hasattr(client, 'aclose') and callable(getattr(client, 'aclose')):
-            try:
-                await client.aclose()
-                return
-            except Exception:
-                pass
-        # Fallback to sync close
-        if hasattr(client, 'close') and callable(getattr(client, 'close')):
-            try:
-                client.close()
-            except Exception:
-                pass
+        """Clean up references."""
         self.cli = None
 
     async def get_models(self, **kwargs) -> List[str]:
         if not self.cli:
             raise ValueError("Mistral client is not initialized. Check Mistral API key.")
 
-        # The SDK methods are synchronous in examples; run in thread to be safe.
         res = await asyncio.to_thread(self.cli.models.list)
-        ids: List[str] = []
-        data = getattr(res, 'data', None)
-        if isinstance(data, list):
-            for m in data:
-                mid = getattr(m, 'id', None)
-                if mid:
-                    ids.append(str(mid))
+        ids = []
+        if hasattr(res, 'data'):
+            for m in res.data:
+                if hasattr(m, 'id'):
+                    ids.append(str(m.id))
         return sorted(ids)
 
     async def _wait_with_cancellation(self, awaitable, is_cancelled_callback: Optional[Callable[[], bool]] = None, poll: float = 0.1) -> Any:
@@ -84,26 +63,17 @@ class MistralProvider(ProviderBase):
         if not self.cli:
             raise ValueError("Mistral client is not initialized")
 
-        # Wrap the sync SDK call into a callable for to_thread
         def _do_chat():
             return self.cli.chat.complete(
                 model=self.model,
                 messages=messages,
-                stream=False,
                 temperature=0.2,
             )
         try:
             r = await self._wait_with_cancellation(asyncio.to_thread(_do_chat), is_cancelled_callback)
-            # ChatCompletionResponse -> choices[0].message.content
-            # Be defensive if shape changes
-            choices = getattr(r, 'choices', None)
-            if not choices:
+            if not hasattr(r, 'choices') or not r.choices:
                 raise ValueError("Mistral response missing 'choices'")
-            first = choices[0]
-            message = getattr(first, 'message', None)
-            if not message or not hasattr(message, 'content'):
-                raise ValueError("Mistral response missing 'message.content'")
-            return message.content
+            return r.choices[0].message.content
         except asyncio.CancelledError:
             self.logger.info("Mistral API call cancelled by user.")
             raise
